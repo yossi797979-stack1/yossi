@@ -16,14 +16,19 @@
       <button id="prevPage" title="עמוד קודם">›</button>
       <span id="pageInfo">עמוד 1 מתוך 1</span>
       <button id="nextPage" title="עמוד הבא">‹</button>
-      <button id="addPage">＋ עמוד חדש</button>
-      <button id="dupPage">⧉ שכפל עמוד</button>
-      <button id="delPage">🗑 מחק עמוד</button>
+      <button id="addPage">＋ עמוד</button>
+      <button id="dupPage">⧉ שכפל</button>
+      <button id="delPage">🗑 מחק</button>
+    </div>
+    <div class="tb-group">
+      <button id="btnPreview">👁 תצוגה מקדימה</button>
+      <button id="btnImport">📥 ייבוא מאקסל</button>
+      <button id="btnExcel">📤 ייצוא לאקסל</button>
     </div>
     <div class="tb-group">
       <button id="btnOpen">פתח פרויקט</button>
       <button id="btnSave">שמור פרויקט</button>
-      <button id="btnReset">טען את הדוגמה מחדש</button>
+      <button id="btnReset">טען דוגמה</button>
     </div>
     <div class="tb-group">
       <button id="btnExportJpg" class="primary">ייצוא JPG (עמוד זה)</button>
@@ -32,9 +37,7 @@
   </header>
 
   <main class="layout">
-    <aside class="form-panel" id="formPanel">
-      <!-- נבנה מ-JS -->
-    </aside>
+    <aside class="form-panel" id="formPanel"></aside>
 
     <section class="workspace" id="workspace">
       <div class="preview-wrap" id="previewWrap">
@@ -51,6 +54,7 @@
   <input type="file" id="fileInput" accept="image/*" hidden>
   <input type="file" id="projectInput" accept=".json,application/json" hidden>
 
+  <div id="modalHost"></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <div id="busy" class="busy" hidden><div class="busy-box"><div class="spinner"></div><div id="busyText">מעבד…</div></div></div>
   <div id="exportHost" class="export-host" aria-hidden="true"></div>
@@ -58,6 +62,8 @@
   <script src="lib/JsBarcode.all.min.js"></script>
   <script src="lib/jspdf.umd.min.js"></script>
   <script src="lib/html2canvas-pro.min.js"></script>
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="lib/jszip.min.js"></script>
   <script src="samples.js"></script>
   <script src="app.js"></script>
 </body>
