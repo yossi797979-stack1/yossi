@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מעצב דף קטלוג A4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&family=Heebo:wght@400;500;700;900&family=Rubik:wght@400;500;700;900&family=Frank+Ruhl+Libre:wght@400;700&family=Secular+One&family=Varela+Round&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🗂️ מעצב דף קטלוג <span>A4</span></div>
+    <div class="tb-group">
+      <button id="btnNew" title="התחל מתבנית הקטלוג">תבנית חדשה</button>
+      <button id="btnBlank" title="דף ריק">דף ריק</button>
+      <button id="btnOpen" title="פתח קובץ פרויקט (.json)">פתח פרויקט</button>
+      <button id="btnSave" title="שמור קובץ פרויקט (.json)">שמור פרויקט</button>
+    </div>
+    <div class="tb-group">
+      <button id="btnUndo" title="ביטול (Ctrl+Z)">↶ ביטול</button>
+      <button id="btnRedo" title="חזרה (Ctrl+Y)">↷ חזרה</button>
+    </div>
+    <div class="tb-group">
+      <button id="btnExportJpg" class="primary">ייצוא JPG ‏(150dpi)</button>
+      <button id="btnExportPdf" class="primary">ייצוא PDF ‏(150dpi)</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel" id="toolsPanel">
+      <h3>הוספת רכיבים</h3>
+      <div class="btn-grid">
+        <button data-add="product">＋ כרטיס מוצר</button>
+        <button data-add="image">🖼️ תמונה</button>
+        <button data-add="logo">⭐ לוגו</button>
+        <button data-add="text">T טקסט</button>
+        <button data-add="barcode">▥ ברקוד EAN-13</button>
+        <button data-add="rect">▭ מלבן / צורה</button>
+        <button data-add="line">― קו</button>
+      </div>
+
+      <h3>הגדרות דף</h3>
+      <label class="row">צבע רקע הדף <input type="color" id="pageBg"></label>
+      <label class="row"><span>רשת עזר</span> <input type="checkbox" id="pageGrid"></label>
+      <label class="row"><span>הצמדה לרשת (5px)</span> <input type="checkbox" id="pageSnap"></label>
+      <label class="row"><span>שוליים להדפסה</span> <input type="checkbox" id="pageMargins"></label>
+
+      <h3>שכבות</h3>
+      <ul id="layers" class="layers"></ul>
+
+      <h3>קיצורים</h3>
+      <ul class="help">
+        <li>קליק – בחירה (כרטיס מוצר נבחר כקבוצה)</li>
+        <li>דאבל-קליק – בחירת רכיב בודד / עריכת טקסט / החלפת תמונה</li>
+        <li>Shift+קליק – בחירה מרובה, גרירה על רקע הדף – בחירה באזור</li>
+        <li>חיצים – הזזה (Shift ×10), Delete – מחיקה</li>
+        <li>Ctrl+Z / Ctrl+Y, Ctrl+C / Ctrl+V, Ctrl+D – שכפול</li>
+        <li>הדבקת תמונה (Ctrl+V) או גרירת קובץ לדף</li>
+      </ul>
+    </aside>
+
+    <section class="workspace" id="workspace">
+      <div class="stage-wrap" id="stageWrap">
+        <div class="stage" id="stage">
+          <div id="page" class="page"></div>
+          <div id="overlay" class="overlay"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" id="propsPanel">
+      <div id="props"></div>
+    </aside>
+  </main>
+
+  <footer class="statusbar">
+    <div>
+      <button id="zoomOut">−</button>
+      <span id="zoomLabel">100%</span>
+      <button id="zoomIn">+</button>
+      <button id="zoomFit">התאם לחלון</button>
+    </div>
+    <div id="status">A4 ‏210×297 מ"מ · ייצוא 1240×1754 פיקסלים (150dpi)</div>
+  </footer>
+
+  <input type="file" id="fileInput" accept="image/*" hidden>
+  <input type="file" id="projectInput" accept=".json,application/json" hidden>
+
+  <div id="busy" class="busy" hidden><div class="busy-box"><div class="spinner"></div><div id="busyText">מעבד…</div></div></div>
+
+  <script src="lib/JsBarcode.all.min.js"></script>
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script src="lib/html2canvas-pro.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
