@@ -747,7 +747,7 @@
         addElements([makeEl('image', { ...p, w, h, asset })]);
       }
     } catch (err) {
-      console.error(err); alert('לא ניתן לטעון את התמונה');
+      console.error(err); toast('לא ניתן לטעון את התמונה');
     } finally { hideBusy(); }
   }
 
@@ -870,7 +870,7 @@
 
   async function processImage(el, mode) {
     if (!el || !el.asset) return;
-    if (el.asset === PH_PRODUCT || el.asset === PH_LOGO) { alert('קודם יש להוסיף תמונה (לחיצה כפולה על התמונה או "החלף תמונה")'); return; }
+    if (el.asset === PH_PRODUCT || el.asset === PH_LOGO) { toast('קודם יש להוסיף תמונה (לחיצה כפולה על התמונה או "החלף תמונה")'); return; }
     const srcAsset = el.orig || el.asset;      // תמיד עובדים מהמקור כדי לאפשר ניסיון חוזר ברגישות אחרת
     const src = mode === 'trim' ? assets[el.asset] : assets[srcAsset];
     try {
@@ -879,6 +879,8 @@
         showBusy('מסיר רקע…');
         await new Promise(r => setTimeout(r, 30));
         canvas = floodRemove(imageToCanvas(await loadImage(src)), toleranceVal);
+      } else if (mode === 'ai' && IN_VIEWER) {
+        throw new Error('בגרסת הקישור של Claude אין גישה לשרת המודל. הסרת רקע AI עובדת כשפותחים את index.html מהמחשב. כאן אפשר להשתמש ב"הסרת רקע מהירה".');
       } else if (mode === 'ai') {
         showBusy('טוען מודל AI להסרת רקע (בפעם הראשונה עשוי לקחת עד דקה)…');
         const mod = await loadAI();
@@ -903,8 +905,8 @@
       commit(); renderAll();
     } catch (err) {
       console.error(err);
-      if (mode === 'ai') alert('הסרת רקע AI נכשלה (ייתכן שאין חיבור לאינטרנט). אפשר להשתמש ב"הסרת רקע מהירה".\n\n' + (err && err.message || err));
-      else alert('העיבוד נכשל: ' + (err && err.message || err));
+      if (mode === 'ai') toast('הסרת רקע AI נכשלה: ' + (err && err.message || err));
+      else toast('העיבוד נכשל: ' + (err && err.message || err));
     } finally { hideBusy(); }
   }
 
@@ -1159,7 +1161,22 @@
     return out;
   }
   const canvasToBlob = (c, type, q) => new Promise(r => c.toBlob(r, type, q));
-  function download(blob, name) {
+  // בתוך מציג Artifacts של Claude הורדה ישירה חסומה – משתמשים ביכולת downloads
+  const IN_VIEWER = !!(window.claude && typeof window.claude.use === 'function');
+  let downloadsCap;
+  async function download(blob, name) {
+    if (IN_VIEWER) {
+      if (downloadsCap === undefined) { try { downloadsCap = await window.claude.use('downloads'); } catch (e) { downloadsCap = null; } }
+      if (downloadsCap) {
+        try { await downloadsCap.save({ filename: name, data: blob }); toast('הקובץ נשמר: ' + name, 'ok'); }
+        catch (err) {
+          if (err && err.code === 'declined') toast('השמירה בוטלה');
+          else if (err && err.code === 'rate_limited') toast('חלון שמירה כבר פתוח – נסו שוב בעוד רגע');
+          else toast('לא ניתן לשמור קובץ כאן: ' + (err && (err.message || err.code) || err));
+        }
+        return;
+      }
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
@@ -1177,7 +1194,7 @@
       const blob = await canvasToBlob(c, 'image/jpeg', 0.95);
       const bytes = setJpegDpi(new Uint8Array(await blob.arrayBuffer()), EXPORT_DPI);
       download(new Blob([bytes], { type: 'image/jpeg' }), fileBase() + '.jpg');
-    } catch (err) { console.error(err); alert('הייצוא נכשל: ' + err.message); }
+    } catch (err) { console.error(err); toast('הייצוא נכשל: ' + err.message); }
     finally { hideBusy(); }
   }
   async function exportPDF() {
@@ -1189,7 +1206,7 @@
       pdf.setProperties({ title: fileBase(), creator: 'A4 Catalog Designer' });
       pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, 297, undefined, 'NONE');
       download(pdf.output('blob'), fileBase() + '.pdf');
-    } catch (err) { console.error(err); alert('הייצוא נכשל: ' + err.message); }
+    } catch (err) { console.error(err); toast('הייצוא נכשל: ' + err.message); }
     finally { hideBusy(); }
   }
   $('#btnExportJpg').onclick = exportJPG;
@@ -1217,15 +1234,15 @@
   $('#btnOpen').onclick = () => { $('#projectInput').value = ''; $('#projectInput').click(); };
   $('#projectInput').addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
-    try { loadProjectData(JSON.parse(await f.text())); } catch (err) { alert('לא ניתן לפתוח: ' + err.message); }
+    try { loadProjectData(JSON.parse(await f.text())); } catch (err) { toast('לא ניתן לפתוח: ' + err.message); }
   });
   $('#btnNew').onclick = () => {
-    if (doc.elements.length && !confirm('להתחיל מתבנית הקטלוג? (אפשר לבטל עם Ctrl+Z)')) return;
     doc = catalogTemplate(); selection = []; commit(); renderAll();
+    toast('נטענה תבנית הקטלוג. לחזרה לעבודה הקודמת: ↶ ביטול');
   };
   $('#btnBlank').onclick = () => {
-    if (doc.elements.length && !confirm('לנקות את הדף? (אפשר לבטל עם Ctrl+Z)')) return;
     doc = blankDoc(); selection = []; commit(); renderAll();
+    toast('הדף נוקה. לחזרה לעבודה הקודמת: ↶ ביטול');
   };
   $('#btnUndo').onclick = undo;
   $('#btnRedo').onclick = redo;
@@ -1251,6 +1268,16 @@
   }
 
   // ---------- חלון עיבוד ----------
+  let toastTimer;
+  function toast(msg, kind) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast' + (kind === 'ok' ? ' ok' : kind === undefined ? '' : '');
+    if (/נכשל|לא ניתן|שגו|קודם/.test(msg)) t.classList.add('bad');
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, Math.min(12000, 3500 + msg.length * 40));
+  }
   function showBusy(t) { $('#busyText').textContent = t; $('#busy').hidden = false; }
   function setBusy(t) { $('#busyText').textContent = t; }
   function hideBusy() { $('#busy').hidden = true; }

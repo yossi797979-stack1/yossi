@@ -149,7 +149,24 @@ input[type=range] { width: 100%; }
 .spinner { width: 28px; height: 28px; border: 3px solid #dbeafe; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.toast {
+  position: fixed; bottom: 46px; left: 50%; transform: translateX(-50%); z-index: 1001;
+  background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 10px; max-width: min(560px, calc(100vw - 32px));
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .3); line-height: 1.5;
+}
+.toast.ok { background: #047857; }
+.toast.bad { background: #b91c1c; }
+
 @media (max-width: 1100px) {
   .panel { width: 230px; }
   #propsPanel { width: 260px; }
+}
+
+@media (max-width: 820px) {
+  html, body { height: auto; }
+  .layout { flex-direction: column; }
+  .panel, #propsPanel { width: 100%; border: 0; border-bottom: 1px solid var(--border); max-height: none; }
+  .workspace { height: 75vh; flex: none; }
+  .stage-wrap { padding: 16px; }
+  .topbar .brand { width: 100%; }
 }
