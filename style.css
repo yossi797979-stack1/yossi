@@ -186,8 +186,10 @@ input[type=range] { width: 100%; }
 .pv-frame .cpage { transform-origin: top left; }
 
 /* עורך תמונה */
-.ed-wrap { display: grid; grid-template-columns: 230px 1fr; gap: 0; flex: 1; min-height: 0; }
-.ed-tools { border-inline-end: 1px solid var(--border); padding: 12px; overflow-y: auto; display: grid; gap: 10px; align-content: start; }
+.ed-wrap { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 0; flex: 1; min-height: 0; }
+.ed-tools { border-inline-end: 1px solid var(--border); padding: 12px; overflow-y: auto; overflow-x: hidden; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.ed-tools button { white-space: normal; }
+.ed-tools .tool-btns > * { min-width: 0; }
 .ed-tools .tool-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .ed-tools button.on { background: #fdecea; border-color: var(--accent); color: var(--accent-dark); font-weight: 700; }
 .ed-stage {

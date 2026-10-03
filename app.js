@@ -7,7 +7,7 @@
   const PAGE_W = 794, PAGE_H = 1123;          // A4 ב-96dpi
   const EXPORT_W = 1240, EXPORT_H = 1754;     // A4 ב-150dpi
   const EXPORT_DPI = 150;
-  const MAX_IMG = 1800;
+  const MAX_IMG = 3000;          // מספיק ל-300dpi גם בתמונה בגודל עמוד
   const AI_BG_URLS = [
     'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm',
     'https://esm.sh/@imgly/background-removal@1.7.0',
@@ -47,7 +47,7 @@
   function addAsset(url) { const id = uid(); assets[id] = url; return id; }
 
   function emptyProduct() {
-    return { show: true, title: '', name: '', code: '', pack: '', ean: '', img: null, orig: null, imgName: '', imgScale: 100, imgY: 0 };
+    return { show: true, title: '', name: '', code: '', pack: '', ean: '', img: null, orig: null, cut: null, imgName: '', imgScale: 100, imgY: 0 };
   }
   const isEmptyProduct = p => !p || (!p.title && !p.name && !p.code && !p.pack && !p.ean && !p.img);
   function newPage(from = {}) {
@@ -94,24 +94,31 @@
     return { ok: false, code: null, msg: 'יש להזין 12 או 13 ספרות (הוזנו ' + d.length + ')' };
   }
   const bcCache = new Map();
+  // ברקוד וקטורי (SVG) – חד בכל רזולוציית הדפסה
   function barcodeURL(value, w, h, fontPx) {
     w = Math.round(w * 10) / 10; h = Math.round(h * 10) / 10;
     const key = [value, w, h, fontPx].join('|');
     if (bcCache.has(key)) return bcCache.get(key);
     const n = normalizeEAN(value);
     if (!n.ok) return null;
-    const c = document.createElement('canvas');
-    const module = 8;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const module = 10;
     let font = 60;
     const opts = h2 => ({ format: 'EAN13', width: module, height: h2, margin: 0, marginLeft: module * 2, marginRight: 0, marginTop: 0, marginBottom: 0,
       displayValue: true, font: 'Arial', fontSize: font, textMargin: Math.round(module * 0.4), background: '#ffffff', lineColor: '#000000' });
+    const size = () => [parseFloat(svg.getAttribute('width')), parseFloat(svg.getAttribute('height'))];
     try {
-      for (let i = 0; i < 3; i++) { JsBarcode(c, n.code, opts(100)); font = Math.max(8, Math.round(fontPx * c.width / w)); }
-      JsBarcode(c, n.code, opts(100));
-      const extra = c.height - 100;
-      const barH = Math.max(20, Math.round(c.width * h / w - extra));
-      JsBarcode(c, n.code, opts(barH));
-      const url = c.toDataURL('image/png');
+      for (let i = 0; i < 3; i++) { JsBarcode(svg, n.code, opts(100)); font = Math.max(8, Math.round(fontPx * size()[0] / w)); }
+      JsBarcode(svg, n.code, opts(100));
+      const extra = size()[1] - 100;
+      JsBarcode(svg, n.code, opts(Math.max(20, Math.round(size()[0] * h / w - extra))));
+      const [W, H] = size();
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      svg.setAttribute('preserveAspectRatio', 'none');
+      svg.setAttribute('width', W); svg.setAttribute('height', H);
+      svg.removeAttribute('style');
+      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(svg));
       if (bcCache.size > 500) bcCache.clear();
       bcCache.set(key, url);
       return url;
@@ -161,15 +168,18 @@
     return H.join('');
   }
 
-  function buildPage(pg, index, interactive) {
-    const s = state.settings;
+  // bleed = שולי גלישה בפיקסלים (להדפסה): רכיבים שנוגעים בקצה הדף נמשכים מעבר לקו החיתוך
+  function buildPage(pg, index, interactive, bleed = 0) {
+    const s = state.settings, B = bleed;
     const el = document.createElement('div');
     el.className = 'cpage';
     el.style.background = s.pageBg;
+    if (B) { el.style.width = PAGE_W + 2 * B + 'px'; el.style.height = PAGE_H + 2 * B + 'px'; }
     const H = [];
-    H.push(`<div class="abs" style="${box(0, 0, PAGE_W, L.grayH)}background:linear-gradient(to right, ${s.grayFrom} 0%, ${s.grayFrom} 45%, ${s.grayTo} 100%);"></div>`);
-    H.push(`<div class="abs" style="${box(0, 0, L.redW, L.redH)}background:${s.accent};"></div>`);
-    H.push(`<div class="abs" style="${box(L.redW - L.redSlant, 0, L.redSlant * 2, L.redH)}background:${s.accent};transform:skewX(${-Math.atan(L.redSlant / L.redH) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
+    const tanTop = L.redSlant / L.redH, tanBot = L.botRed.slant / L.botRed.h;
+    H.push(`<div class="abs" style="${box(-B, -B, PAGE_W + 2 * B, L.grayH + B)}background:linear-gradient(to right, ${s.grayFrom} 0%, ${s.grayFrom} 45%, ${s.grayTo} 100%);"></div>`);
+    H.push(`<div class="abs" style="${box(-B, -B, L.redW + B, L.redH + B)}background:${s.accent};"></div>`);
+    H.push(`<div class="abs" style="${box(L.redW - L.redSlant - B * tanTop, -B, L.redSlant * 2, L.redH + B)}background:${s.accent};transform:skewX(${-Math.atan(tanTop) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
     if (pg.logo && assets[pg.logo]) {
       const k = (pg.logoScale || 100) / 100, w = L.logo.w * k, h = L.logo.h * k;
       H.push(`<img class="abs c-logo" data-go="header" src="${assets[pg.logo]}" style="${box(L.logo.x, L.logo.y + (L.logo.h - h) / 2, w, h)}object-position:left center;">`);
@@ -190,9 +200,9 @@
     if (s.showPageNum) H.push(`<div class="abs c-foot-num" data-go="footer" style="${box(L.foot.numX - 25, L.foot.cy - 10, 50, 20)}font-size:15px;line-height:20px;">${(+s.firstPage || 1) + index}</div>`);
     if (s.showFooterLogo && s.logoFooter && assets[s.logoFooter]) H.push(`<img class="abs c-logo" data-go="footer" src="${assets[s.logoFooter]}" style="${box(L.foot.logo.x, L.foot.logo.y, L.foot.logo.w, L.foot.logo.h)}">`);
     H.push(`<div class="abs c-foot-web" data-go="footer" style="right:${px(L.foot.webRight)};top:${px(L.foot.cy - 10)};width:300px;height:20px;font-size:13.5px;line-height:20px;letter-spacing:2.6px;">${esc(s.website)}</div>`);
-    H.push(`<div class="abs" style="${box(0, L.botRed.y, L.botRed.w, L.botRed.h)}background:${s.accent};"></div>`);
-    H.push(`<div class="abs" style="${box(L.botRed.w - L.botRed.slant, L.botRed.y, L.botRed.slant * 2, L.botRed.h)}background:${s.accent};transform:skewX(${-Math.atan(L.botRed.slant / L.botRed.h) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
-    el.innerHTML = H.join('');
+    H.push(`<div class="abs" style="${box(-B, L.botRed.y, L.botRed.w + B, L.botRed.h + B)}background:${s.accent};"></div>`);
+    H.push(`<div class="abs" style="${box(L.botRed.w - L.botRed.slant, L.botRed.y, L.botRed.slant * 2, L.botRed.h + B)}background:${s.accent};transform:skewX(${-Math.atan(tanBot) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
+    el.innerHTML = B ? `<div class="abs" style="${box(B, B, PAGE_W, PAGE_H)}">${H.join('')}</div>` : H.join('');
     if (!interactive) $$('[data-slot],[data-go]', el).forEach(n => { n.removeAttribute('data-slot'); n.removeAttribute('data-go'); });
     return el;
   }
@@ -443,7 +453,7 @@
     const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, w, h);
     const d = g.getImageData(0, 0, w, h).data;
     let alpha = false; for (let i = 3; i < d.length; i += 28) if (d[i] < 250) { alpha = true; break; }
-    return alpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.92);
+    return alpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.95);
   }
   async function loadImageInto(key, file) {
     if (!file.type.startsWith('image/')) { toast('הקובץ אינו תמונה', 'bad'); return; }
@@ -452,7 +462,7 @@
       const url = await normalizeImage(await fileToDataURL(file));
       const r = imgRef(key);
       r.obj[r.k] = addAsset(url);
-      if (!r.logo) { r.obj.orig = null; r.obj.imgName = file.name; }
+      if (!r.logo) { r.obj.orig = null; r.obj.cut = null; r.obj.imgName = file.name; }
       renderForm(); renderPreview(); scheduleSave();
     } catch (e) { console.error(e); toast('לא ניתן לטעון את התמונה', 'bad'); }
     finally { hideBusy(); }
@@ -461,40 +471,71 @@
   async function imageAction(key, act) {
     const r = imgRef(key);
     if (act === 'pick') { pickKey = key; $('#fileInput').value = ''; $('#fileInput').click(); return; }
-    if (act === 'clear') { r.obj[r.k] = null; if (!r.logo) r.obj.orig = null; renderForm(); schedulePreview(); return; }
-    if (act === 'restore') { if (r.obj.orig) { r.obj[r.k] = r.obj.orig; r.obj.orig = null; renderForm(); schedulePreview(); } return; }
+    if (act === 'clear') { r.obj[r.k] = null; if (!r.logo) { r.obj.orig = null; r.obj.cut = null; } renderForm(); schedulePreview(); return; }
+    if (act === 'restore') { if (r.obj.orig) { r.obj[r.k] = r.obj.orig; r.obj.orig = null; r.obj.cut = null; renderForm(); schedulePreview(); } return; }
     if (act === 'edit') { openEditor(key); return; }
     const id = r.obj[r.k]; if (!id || !assets[id]) return;
-    const srcId = (!r.logo && r.obj.orig && act !== 'trim') ? r.obj.orig : id;
     try {
-      let canvas;
+      if (act === 'trim') {
+        showBusy('חותך שוליים…');
+        const c = toCanvas(await loadImg(assets[id]));
+        r.obj[r.k] = addAsset(r.logo ? trimmed(c, true).toDataURL('image/png') : flattenOnWhite(trimmed(c, true)));
+        renderForm(); renderPreview(); scheduleSave(); toast('השוליים נחתכו', 'ok');
+        return;
+      }
+      const { src, srcId } = await editorSources(r, false);
       if (act === 'bgFast') {
         showBusy('מסיר רקע…'); await new Promise(z => setTimeout(z, 30));
-        canvas = floodRemove(toCanvas(await loadImg(assets[srcId])), tolerance);
+        const cut = floodRemove(copyCanvas(src), tolerance);
+        refineCutout(cut, src, { hard: 50, shrink: 0, specks: true });
+        commitCutout(r, cut, srcId);
+        toast(r.logo ? 'הרקע הוסר (שקוף)' : 'הרקע הוסר והתמונה נצרבה על רקע לבן. לתיקונים: "עריכה ידנית".', 'ok');
       } else if (act === 'bgAI') {
-        if (IN_VIEWER) throw new Error('בגרסת הקישור אין גישה לשרת המודל. הסרת רקע AI עובדת כשפותחים את index.html מהמחשב. כאן השתמשו ב"הסר רקע" או ב"עריכה ידנית".');
-        showBusy('טוען מודל AI (בפעם הראשונה עד דקה)…');
-        const mod = await loadAI();
-        const fn = mod.removeBackground || mod.default?.removeBackground || mod.default;
-        const blob = await (await fetch(assets[srcId])).blob();
-        const out = await fn(blob, { output: { format: 'image/png' }, progress: (k, c, t) => { if (t) setBusy(`מוריד מודל… ${Math.round(c / t * 100)}%`); } });
-        setBusy('מסיר רקע…');
-        const u = URL.createObjectURL(out); canvas = toCanvas(await loadImg(u)); URL.revokeObjectURL(u);
-      } else if (act === 'trim') {
-        showBusy('חותך שוליים…'); canvas = toCanvas(await loadImg(assets[id]));
-      } else return;
-      setImageResult(r, canvas, id);
-      toast(act === 'trim' ? 'השוליים נחתכו' : r.logo ? 'הרקע הוסר (שקוף)' : 'הרקע הוסר והתמונה נצרבה על רקע לבן', 'ok');
+        const cut = await aiCutout(src);
+        setBusy('מנקה קצוות…'); await new Promise(z => setTimeout(z, 20));
+        refineCutout(cut, src, AI_REFINE);
+        hideBusy();
+        openEditor(key, { src, work: cut, srcId, note: 'התוצאה של ה-AI מוכנה. בדקו את הקצוות, תקנו עם מחק / שחזר אם צריך, ולחצו שמור.' });
+      }
     } catch (e) {
       console.error(e);
       toast((act === 'bgAI' ? 'הסרת רקע AI נכשלה: ' : 'העיבוד נכשל: ') + (e && e.message || e), 'bad');
     } finally { hideBusy(); }
   }
-  // שמירת תוצאה: לוגו – PNG שקוף; מוצר – "צריבה" על רקע לבן
-  function setImageResult(r, canvas, prevId) {
-    const url = r.logo ? trimmed(canvas, true).toDataURL('image/png') : flattenOnWhite(trimmed(canvas, true));
-    if (!r.logo && !r.obj.orig) r.obj.orig = prevId;
-    r.obj[r.k] = addAsset(url);
+  const AI_REFINE = { hard: 60, shrink: 1, specks: true };
+  // מקור לעריכה: התמונה המקורית + שכבת החיתוך השקופה אם יש, אחרת התמונה הנוכחית
+  async function editorSources(r, withWork = true) {
+    const id = r.obj[r.k];
+    const useCut = !r.logo && r.obj.orig && r.obj.cut && assets[r.obj.orig] && assets[r.obj.cut];
+    const srcId = (!r.logo && r.obj.orig && assets[r.obj.orig]) ? r.obj.orig : id;
+    const sImg = await loadImg(assets[srcId]);
+    const k = Math.min(1, 2400 / Math.max(sImg.naturalWidth, sImg.naturalHeight));
+    const W = Math.max(1, Math.round(sImg.naturalWidth * k)), H = Math.max(1, Math.round(sImg.naturalHeight * k));
+    const src = document.createElement('canvas'); src.width = W; src.height = H;
+    src.getContext('2d').drawImage(sImg, 0, 0, W, H);
+    if (!withWork) return { src, srcId };
+    let work;
+    if (useCut) {
+      work = document.createElement('canvas'); work.width = W; work.height = H;
+      work.getContext('2d').drawImage(await loadImg(assets[r.obj.cut]), 0, 0, W, H);
+    } else if (srcId !== id) {
+      // יש מקור אבל אין שכבת חיתוך (פרויקט ישן) – עובדים על התמונה הנוכחית
+      const cImg = await loadImg(assets[id]);
+      const src2 = document.createElement('canvas'); src2.width = cImg.naturalWidth; src2.height = cImg.naturalHeight;
+      src2.getContext('2d').drawImage(cImg, 0, 0);
+      return { src: src2, work: copyCanvas(src2), srcId: id };
+    } else work = copyCanvas(src);
+    return { src, work, srcId };
+  }
+  function copyCanvas(c) { const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; o.getContext('2d').drawImage(c, 0, 0); return o; }
+  // שמירת חיתוך: לוגו – PNG שקוף; מוצר – שכבת חיתוך שקופה + "צריבה" על רקע לבן
+  function commitCutout(r, cut, srcId) {
+    if (r.logo) r.obj[r.k] = addAsset(trimmed(cut, true).toDataURL('image/png'));
+    else {
+      if (!r.obj.orig) r.obj.orig = srcId;
+      r.obj.cut = addAsset(cut.toDataURL('image/png'));
+      r.obj[r.k] = addAsset(flattenOnWhite(trimmed(cut, true)));
+    }
     renderForm(); renderPreview(); scheduleSave();
   }
   function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
@@ -566,6 +607,87 @@
     throw err;
   }
 
+  // הסרת רקע ב-AI: מחזיר קנבס באותו גודל כמו המקור, עם שקיפות
+  async function aiCutout(src) {
+    if (IN_VIEWER) throw new Error('בגרסת הקישור אין גישה לשרת המודל. הסרת רקע AI עובדת כשפותחים את index.html מהמחשב. כאן השתמשו ב"הסר רקע" או ב"עריכה ידנית".');
+    showBusy('טוען מודל AI (בפעם הראשונה עד דקה)…');
+    const mod = await loadAI();
+    const fn = mod.removeBackground || mod.default?.removeBackground || mod.default;
+    const blob = await new Promise(res => src.toBlob(res, 'image/png'));
+    const progress = (k, c, t) => { if (t) setBusy(`מוריד מודל AI… ${Math.round(c / t * 100)}%`); };
+    let out;
+    try { out = await fn(blob, { model: 'isnet', output: { format: 'image/png' }, progress }); }   // המודל המדויק ביותר
+    catch (e) { console.warn('isnet failed, falling back', e); out = await fn(blob, { output: { format: 'image/png' }, progress }); }
+    setBusy('מסיר רקע…');
+    const u = URL.createObjectURL(out);
+    try {
+      const img = await loadImg(u);
+      const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+      c.getContext('2d').drawImage(img, 0, 0, src.width, src.height);
+      return c;
+    } finally { URL.revokeObjectURL(u); }
+  }
+
+  // ניקוי קצוות לצריבה נקייה על לבן:
+  // קשיחות – מחדד את מעבר השקיפות; כיווץ – מוריד את הפס הדק של הרקע הישן סביב המוצר;
+  // כתמים – מוחק שאריות קטנות מנותקות; ובסוף צבעי הקצה נלקחים מתוך המוצר (בלי "הילה" אפורה)
+  function refineCutout(cut, src, { hard = 60, shrink = 1, specks = true } = {}) {
+    const w = cut.width, h = cut.height, N = w * h;
+    const cg = cut.getContext('2d', { willReadFrequently: true });
+    const im = cg.getImageData(0, 0, w, h), d = im.data;
+    const sd = src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+    let a = new Float32Array(N);
+    const bw = 1 - (hard / 100) * 0.9, lo = 0.5 - bw / 2, hi = 0.5 + bw / 2;
+    for (let i = 0; i < N; i++) { const v = d[i * 4 + 3] / 255; a[i] = v <= lo ? 0 : v >= hi ? 1 : (v - lo) / (hi - lo); }
+    if (specks) {
+      const lab = new Int32Array(N), q = new Int32Array(N), sizes = [0];
+      let n = 0;
+      for (let i = 0; i < N; i++) {
+        if (a[i] < 0.5 || lab[i]) continue;
+        n++; let qh = 0, qt = 0; q[qt++] = i; lab[i] = n; let cnt = 0;
+        while (qh < qt) {
+          const j = q[qh++], x = j % w, y = (j - x) / w; cnt++;
+          if (x > 0 && !lab[j - 1] && a[j - 1] >= 0.5) { lab[j - 1] = n; q[qt++] = j - 1; }
+          if (x < w - 1 && !lab[j + 1] && a[j + 1] >= 0.5) { lab[j + 1] = n; q[qt++] = j + 1; }
+          if (y > 0 && !lab[j - w] && a[j - w] >= 0.5) { lab[j - w] = n; q[qt++] = j - w; }
+          if (y < h - 1 && !lab[j + w] && a[j + w] >= 0.5) { lab[j + w] = n; q[qt++] = j + w; }
+        }
+        sizes.push(cnt);
+      }
+      const biggest = Math.max(0, ...sizes.slice(1));
+      const minSize = Math.max(30, biggest * 0.015);
+      // כתם קטן ומנותק נמחק, כולל השוליים הרכים שסביבו
+      const kill = new Uint8Array(n + 1);
+      for (let k = 1; k <= n; k++) if (sizes[k] < minSize) kill[k] = 1;
+      for (let i = 0; i < N; i++) if (lab[i] && kill[lab[i]]) a[i] = 0;
+    }
+    for (let s = 0; s < shrink; s++) {
+      const b2 = new Float32Array(a);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x; if (a[i] === 0) continue;
+        if ((x > 0 && a[i - 1] === 0) || (x < w - 1 && a[i + 1] === 0) || (y > 0 && a[i - w] === 0) || (y < h - 1 && a[i + w] === 0)) b2[i] = a[i] * 0.35;
+      }
+      a = b2;
+    }
+    // צבע: מהמקור; בפיקסלי קצה – ממוצע של פיקסלים אטומים סמוכים
+    const R = 3;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, o = i * 4;
+      let r = sd[o], g = sd[o + 1], b = sd[o + 2];
+      if (a[i] > 0 && a[i] < 0.98) {
+        let sr = 0, sg = 0, sb = 0, c = 0;
+        for (let yy = Math.max(0, y - R); yy <= Math.min(h - 1, y + R); yy++)
+          for (let xx = Math.max(0, x - R); xx <= Math.min(w - 1, x + R); xx++) {
+            const j = yy * w + xx; if (a[j] >= 0.98) { sr += sd[j * 4]; sg += sd[j * 4 + 1]; sb += sd[j * 4 + 2]; c++; }
+          }
+        if (c) { r = sr / c; g = sg / c; b = sb / c; }
+      }
+      d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = Math.round(a[i] * 255);
+    }
+    cg.putImageData(im, 0, 0);
+    return cut;
+  }
+
   // ---------- חלונות ----------
   function openModal(html, { wide = false, onClose } = {}) {
     const back = document.createElement('div');
@@ -607,34 +729,43 @@
     };
     m.el.addEventListener('click', e => {
       const b = e.target.closest('[data-pv]'); if (!b) return;
-      if (b.dataset.pv === 'pdf') { m.close(); exportPDF(); return; }
+      if (b.dataset.pv === 'pdf') { m.close(); openExportDialog('pdf'); return; }
       mode = b.dataset.pv; draw();
     });
     requestAnimationFrame(draw);
   };
 
   // ---------- עורך תמונה ידני ----------
-  async function openEditor(key) {
+  async function openEditor(key, preset) {
     const r = imgRef(key);
     const id = r.obj[r.k]; if (!id || !assets[id]) return;
-    const img = await loadImg(assets[id]);
-    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-    const W = Math.max(1, Math.round(img.naturalWidth * k)), H = Math.max(1, Math.round(img.naturalHeight * k));
-    const src = document.createElement('canvas'); src.width = W; src.height = H; src.getContext('2d').drawImage(img, 0, 0, W, H);
+    showBusy('פותח עורך…');
+    let srcs;
+    try { srcs = preset || await editorSources(r); } finally { hideBusy(); }
+    const { src, work, srcId } = srcs;
+    const W = src.width, H = src.height;
 
     const m = openModal(`<div class="modal-head"><h2>עריכת תמונה – מחיקת רקע ידנית</h2>
         <button class="close-x" data-close aria-label="סגור">✕</button></div>
       <div class="ed-wrap">
         <div class="ed-tools">
+          ${preset && preset.note ? `<div class="warn">${esc(preset.note)}</div>` : ''}
           <div class="f"><label>כלי</label><div class="tool-btns">
             <button data-tool="erase" class="on">🧽 מחק</button><button data-tool="restore">🖌 שחזר</button>
             <button data-tool="wand">🪄 מטה קסם</button><button data-tool="pan">✋ הזזה</button></div></div>
           <div class="f"><label for="edSize">גודל מברשת: <span id="edSizeOut">40</span></label><input type="range" id="edSize" min="4" max="200" value="40"></div>
           <div class="f"><label for="edTol">רגישות מטה קסם / אוטומטי: <span id="edTolOut">${tolerance}</span></label><input type="range" id="edTol" min="4" max="120" value="${tolerance}"></div>
-          <div class="hint"><b>מחק</b> – מעבירים על אזורי הרקע. <b>שחזר</b> – מחזיר חלקים שנמחקו בטעות. <b>מטה קסם</b> – לחיצה על צבע הרקע מוחקת את כל האזור הדומה הרציף.</div>
-          <div class="tool-btns"><button data-ed="auto">⚡ הסרה אוטומטית</button><button data-ed="undo">↶ בטל</button>
-            <button data-ed="reset">↺ התחל מחדש</button><button data-ed="zin">🔍＋</button><button data-ed="zout">🔍−</button><button data-ed="fit">התאם</button></div>
-          <label class="check"><input type="checkbox" id="edWhite"> הצג על רקע לבן</label>
+          <div class="hint"><b>מחק</b> – מעבירים על אזורי הרקע. <b>שחזר</b> – מחזיר חלקים של המוצר שנמחקו. <b>מטה קסם</b> – לחיצה על צבע הרקע מוחקת את כל האזור הדומה הרציף.</div>
+          <div class="tool-btns"><button data-ed="ai">✨ הסרת רקע AI</button><button data-ed="auto">⚡ הסרה מהירה</button>
+            <button data-ed="undo">↶ בטל</button><button data-ed="reset">↺ התחל מחדש</button>
+            <button data-ed="zin">🔍＋</button><button data-ed="zout">🔍−</button><button data-ed="fit">התאם</button></div>
+          <div class="box"><h3>ניקוי קצוות</h3>
+            <div class="f"><label for="edHard">חדות הקצה: <span id="edHardOut">${AI_REFINE.hard}</span></label><input type="range" id="edHard" min="0" max="100" value="${AI_REFINE.hard}"></div>
+            <div class="f"><label for="edShrink">כיווץ קצה (פיקסלים): <span id="edShrinkOut">${AI_REFINE.shrink}</span></label><input type="range" id="edShrink" min="0" max="4" value="${AI_REFINE.shrink}"></div>
+            <label class="check"><input type="checkbox" id="edSpecks" checked> מחק כתמים קטנים מנותקים</label>
+            <button data-ed="refine">✨ נקה קצוות</button>
+            <div class="hint">מסיר את הפס האפור סביב המוצר ונותן צריבה נקייה על לבן.</div></div>
+          <label class="check"><input type="checkbox" id="edWhite"> הצג על רקע לבן (כמו בדף)</label>
         </div>
         <div class="ed-stage" id="edStage"><div class="ed-canvas-box" id="edBox"><canvas id="edCanvas"></canvas><div class="ed-cursor" id="edCursor" hidden></div></div></div>
       </div>
@@ -643,8 +774,9 @@
     const el = m.el, stage = $('#edStage', el), boxEl = $('#edBox', el), cv = $('#edCanvas', el), cursor = $('#edCursor', el);
     cv.width = W; cv.height = H;
     const g = cv.getContext('2d', { willReadFrequently: true });
-    g.drawImage(src, 0, 0);
+    g.drawImage(work, 0, 0);
     let tool = 'erase', size = 40, tol = tolerance, disp = 1;
+    const refineOpts = Object.assign({}, AI_REFINE);
     const undo = [];
     const pushUndo = () => { undo.push(g.getImageData(0, 0, W, H)); if (undo.length > 25) undo.shift(); };
     const fit = () => { disp = Math.min((stage.clientWidth - 40) / W, (stage.clientHeight - 40) / H, 4); setDisp(disp); };
@@ -718,6 +850,9 @@
       if (e.target.id === 'edSize') { size = +e.target.value; $('#edSizeOut', el).textContent = size; updCursor(); }
       if (e.target.id === 'edTol') { tol = +e.target.value; $('#edTolOut', el).textContent = tol; }
       if (e.target.id === 'edWhite') stage.style.backgroundImage = e.target.checked ? 'none' : '';
+      if (e.target.id === 'edHard') { refineOpts.hard = +e.target.value; $('#edHardOut', el).textContent = e.target.value; }
+      if (e.target.id === 'edShrink') { refineOpts.shrink = +e.target.value; $('#edShrinkOut', el).textContent = e.target.value; }
+      if (e.target.id === 'edSpecks') refineOpts.specks = e.target.checked;
     });
     el.addEventListener('click', e => {
       const t = e.target.closest('[data-tool]');
@@ -729,11 +864,26 @@
       const a = b.dataset.ed;
       if (a === 'undo') { const u = undo.pop(); if (u) g.putImageData(u, 0, 0); }
       if (a === 'reset') { pushUndo(); g.clearRect(0, 0, W, H); g.drawImage(src, 0, 0); }
-      if (a === 'auto') { pushUndo(); floodRemove(cv, tol); }
+      if (a === 'auto') { pushUndo(); g.clearRect(0, 0, W, H); g.drawImage(src, 0, 0); floodRemove(cv, tol); refineCutout(cv, src, { hard: 50, shrink: 0, specks: true }); }
+      if (a === 'refine') {
+        pushUndo(); showBusy('מנקה קצוות…');
+        setTimeout(() => { try { refineCutout(cv, src, refineOpts); } finally { hideBusy(); } }, 20);
+      }
+      if (a === 'ai') {
+        (async () => {
+          try {
+            const cut = await aiCutout(src);
+            setBusy('מנקה קצוות…'); await new Promise(z => setTimeout(z, 20));
+            refineCutout(cut, src, refineOpts);
+            pushUndo(); g.clearRect(0, 0, W, H); g.drawImage(cut, 0, 0);
+          } catch (err) { console.error(err); toast('הסרת רקע AI נכשלה: ' + (err && err.message || err), 'bad'); }
+          finally { hideBusy(); }
+        })();
+      }
       if (a === 'zin') setDisp(disp * 1.25);
       if (a === 'zout') setDisp(disp / 1.25);
       if (a === 'fit') fit();
-      if (a === 'save') { setImageResult(r, cv, id); m.close(); toast(r.logo ? 'התמונה נשמרה עם רקע שקוף' : 'התמונה נשמרה על רקע לבן', 'ok'); }
+      if (a === 'save') { commitCutout(r, cv, srcId); m.close(); toast(r.logo ? 'התמונה נשמרה עם רקע שקוף' : 'התמונה נשמרה על רקע לבן', 'ok'); }
     });
   }
 
@@ -754,16 +904,30 @@
     delArmed = 0; state.pages.splice(cur, 1); goPage(Math.min(cur, state.pages.length - 1)); toast('העמוד נמחק');
   };
 
-  // ---------- ייצוא תמונה / PDF ----------
-  async function renderCanvas(index) {
+  // ---------- ייצוא לדפוס: PDF / JPG ----------
+  const EXPORT_PRESETS = {
+    print: { label: 'בית דפוס: 300dpi, גלישה 3 מ"מ וסימני חיתוך (מומלץ)', dpi: 300, bleed: 3, marks: true },
+    printExact: { label: 'דפוס בלי גלישה: 300dpi, A4 מדויק', dpi: 300, bleed: 0, marks: false },
+    hq: { label: 'איכות גבוהה במיוחד: 600dpi, A4 מדויק', dpi: 600, bleed: 0, marks: false },
+    screen: { label: 'מסך או מייל: 150dpi, קובץ קטן', dpi: 150, bleed: 0, marks: false },
+  };
+  let exportOpts = { preset: 'print', dpi: 300, bleed: 3, marks: true, pdfQuality: 'jpeg' };
+  try { Object.assign(exportOpts, JSON.parse(localStorage.getItem('catalog-export') || '{}')); } catch (e) { /* ללא אחסון */ }
+  const saveExportOpts = () => { try { localStorage.setItem('catalog-export', JSON.stringify(exportOpts)); } catch (e) { /* ללא אחסון */ } };
+  const MM = 96 / 25.4;   // פיקסלים במילימטר (ב-96dpi)
+
+  // מרנדר עמוד לקנבס ברזולוציה ובגלישה המבוקשות
+  async function renderCanvas(index, opts = exportOpts) {
+    const dpi = +opts.dpi || 300, bleedMM = +opts.bleed || 0, B = bleedMM * MM;
     const hostEl = $('#exportHost');
-    const el = buildPage(state.pages[index], index, false);
+    const el = buildPage(state.pages[index], index, false, B);
     hostEl.replaceChildren(el);
     await document.fonts.ready;
     await Promise.all($$('img', el).map(i => i.complete ? null : new Promise(r => { i.onload = i.onerror = r; })));
+    const W = PAGE_W + 2 * B, H = PAGE_H + 2 * B;
     try {
       const c = await window.html2canvas(el, {
-        scale: EXPORT_W / PAGE_W, width: PAGE_W, height: PAGE_H, backgroundColor: state.settings.pageBg, logging: false, useCORS: true,
+        scale: dpi / 96, width: W, height: H, backgroundColor: state.settings.pageBg, logging: false, useCORS: true,
         onclone: (cd, cel) => {
           // html2canvas מאבד רווחים בעברית; ריווח אותיות זעיר גורם לציור אות-אות במקום המדויק
           const win = cd.defaultView;
@@ -772,9 +936,14 @@
           });
         },
       });
-      const out = document.createElement('canvas'); out.width = EXPORT_W; out.height = EXPORT_H;
-      const g = out.getContext('2d'); g.fillStyle = state.settings.pageBg; g.fillRect(0, 0, EXPORT_W, EXPORT_H);
-      g.drawImage(c, 0, 0, EXPORT_W, EXPORT_H);
+      const out = document.createElement('canvas');
+      out.width = Math.round((210 + 2 * bleedMM) / 25.4 * dpi);
+      out.height = Math.round((297 + 2 * bleedMM) / 25.4 * dpi);
+      const g = out.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.fillStyle = state.settings.pageBg; g.fillRect(0, 0, out.width, out.height);
+      g.drawImage(c, 0, 0, out.width, out.height);
+      c.width = c.height = 0;
       return out;
     } finally { hostEl.replaceChildren(); }
   }
@@ -804,33 +973,117 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
-  $('#btnExportJpg').onclick = async () => {
-    showBusy('מייצא JPG ‏(150dpi)…');
+  const optsTag = o => `${o.dpi}dpi` + (+o.bleed ? ` גלישה ${o.bleed}mm` : '');
+  async function jpgBlob(index, o) {
+    const c = await renderCanvas(index, o);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 1.0));
+    c.width = c.height = 0;
+    return new Blob([setJpegDpi(new Uint8Array(await blob.arrayBuffer()), +o.dpi)], { type: 'image/jpeg' });
+  }
+  async function exportJPG(o = exportOpts) {
+    showBusy(`מייצא JPG ‏(${o.dpi}dpi)…`);
     try {
-      const c = await renderCanvas(cur);
-      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
-      const bytes = setJpegDpi(new Uint8Array(await blob.arrayBuffer()), EXPORT_DPI);
+      const blob = await jpgBlob(cur, o);
       hideBusy();
-      await download(new Blob([bytes], { type: 'image/jpeg' }), `${fileBase()} - עמוד ${(+state.settings.firstPage || 1) + cur}.jpg`);
-    } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); } finally { hideBusy(); }
-  };
-  async function exportPDF() {
-    showBusy('מייצא PDF ‏(150dpi)…');
-    try {
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-      for (let i = 0; i < state.pages.length; i++) {
-        setBusy(`מייצא PDF ‏(150dpi)… עמוד ${i + 1} מתוך ${state.pages.length}`);
-        const c = await renderCanvas(i);
-        if (i > 0) pdf.addPage('a4', 'portrait');
-        pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, 297, undefined, 'NONE');
-      }
-      pdf.setProperties({ title: fileBase() });
-      hideBusy();
-      await download(pdf.output('blob'), fileBase() + '.pdf');
+      await download(blob, `${fileBase()} - עמוד ${(+state.settings.firstPage || 1) + cur} (${optsTag(o)}).jpg`);
     } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); } finally { hideBusy(); }
   }
-  $('#btnExportPdf').onclick = exportPDF;
+  async function exportAllJPG(o = exportOpts) {
+    showBusy('מייצא את כל העמודים כ-JPG…');
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < state.pages.length; i++) {
+        setBusy(`מייצא JPG ‏(${o.dpi}dpi)… עמוד ${i + 1} מתוך ${state.pages.length}`);
+        zip.file(`page-${String((+state.settings.firstPage || 1) + i).padStart(3, '0')}.jpg`, await jpgBlob(i, o));
+      }
+      setBusy('אורז קובץ ZIP…');
+      const blob = await zip.generateAsync({ type: 'blob' });
+      hideBusy();
+      await download(blob, `${fileBase()} - JPG (${optsTag(o)}).zip`);
+    } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); } finally { hideBusy(); }
+  }
+  async function exportPDF(o = exportOpts) {
+    showBusy(`מייצא PDF ‏(${o.dpi}dpi)…`);
+    try {
+      const { jsPDF } = window.jspdf;
+      const b = +o.bleed || 0, slug = o.marks ? 10 : 0;          // שוליים לסימני חיתוך מחוץ לגלישה
+      const pw = 210 + 2 * (b + slug), ph = 297 + 2 * (b + slug);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pw, ph], compress: true });
+      for (let i = 0; i < state.pages.length; i++) {
+        setBusy(`מייצא PDF ‏(${o.dpi}dpi)… עמוד ${i + 1} מתוך ${state.pages.length}`);
+        const c = await renderCanvas(i, o);
+        if (i > 0) pdf.addPage([pw, ph], 'portrait');
+        if (o.pdfQuality === 'png') pdf.addImage(c, 'PNG', slug, slug, 210 + 2 * b, 297 + 2 * b, undefined, 'FAST');
+        else pdf.addImage(c.toDataURL('image/jpeg', 1.0), 'JPEG', slug, slug, 210 + 2 * b, 297 + 2 * b, undefined, 'NONE');
+        c.width = c.height = 0;
+        if (o.marks) drawCropMarks(pdf, slug + b, slug + b, 210, 297, b);
+        await new Promise(z => setTimeout(z, 0));
+      }
+      pdf.setProperties({ title: fileBase(), subject: `A4 ${optsTag(o)}`, creator: 'מחולל דפי קטלוג' });
+      hideBusy();
+      await download(pdf.output('blob'), `${fileBase()} (${optsTag(o)}).pdf`);
+    } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); } finally { hideBusy(); }
+  }
+  // סימני חיתוך בפינות קו החיתוך, מחוץ לאזור הגלישה
+  function drawCropMarks(pdf, x0, y0, w, h, bleed) {
+    const x1 = x0 + w, y1 = y0 + h, gap = bleed + 1, len = 6;
+    pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.1);
+    for (const x of [x0, x1]) { pdf.line(x, y0 - gap - len, x, y0 - gap); pdf.line(x, y1 + gap, x, y1 + gap + len); }
+    for (const y of [y0, y1]) { pdf.line(x0 - gap - len, y, x0 - gap, y); pdf.line(x1 + gap, y, x1 + gap + len, y); }
+  }
+
+  function openExportDialog(focus = 'pdf') {
+    const o = Object.assign({}, exportOpts);
+    const m = openModal(`<div class="modal-head"><h2>ייצוא לדפוס</h2><button class="close-x" data-close aria-label="סגור">✕</button></div>
+      <div class="modal-body">
+        <div class="f"><label for="exPreset">מטרת הקובץ</label><select id="exPreset">
+          ${Object.entries(EXPORT_PRESETS).map(([k, v]) => `<option value="${k}" ${k === o.preset ? 'selected' : ''}>${v.label}</option>`).join('')}
+          <option value="custom" ${o.preset === 'custom' ? 'selected' : ''}>הגדרה ידנית</option></select></div>
+        <div class="box"><h3>הגדרות</h3>
+          <div class="f2"><div class="f"><label for="exDpi">רזולוציה</label><select id="exDpi">
+            ${[150, 300, 400, 600].map(d => `<option value="${d}" ${+o.dpi === d ? 'selected' : ''}>${d}dpi${d === 300 ? ' (תקן דפוס)' : ''}</option>`).join('')}</select></div>
+            <div class="f"><label for="exBleed">גלישה (מ"מ מכל צד)</label><input type="number" id="exBleed" min="0" max="10" step="0.5" value="${o.bleed}"></div></div>
+          <label class="check"><input type="checkbox" id="exMarks" ${o.marks ? 'checked' : ''}> סימני חיתוך ב-PDF</label>
+          <div class="f"><label for="exQ">דחיסת התמונה ב-PDF</label><select id="exQ">
+            <option value="jpeg" ${o.pdfQuality !== 'png' ? 'selected' : ''}>JPEG באיכות 100% (מומלץ)</option>
+            <option value="png" ${o.pdfQuality === 'png' ? 'selected' : ''}>ללא איבוד איכות (PNG, קובץ גדול ואיטי)</option></select></div>
+          <div class="summary" id="exInfo"></div>
+        </div>
+        <div class="hint">גלישה היא הרחבה של הרקעים שבקצה הדף (הפסים האדומים והאפורים) מעבר לקו החיתוך, כדי שלא יישאר פס לבן אחרי החיתוך. רוב בתי הדפוס מבקשים 3 מ"מ.
+          הצבעים נשמרים ב-RGB, ובית הדפוס ממיר אותם ל-CMYK.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="${focus === 'pdf' ? 'primary' : ''}" data-ex="pdf">ייצוא PDF (כל ${state.pages.length} העמודים)</button>
+        <button class="${focus === 'jpg' ? 'primary' : ''}" data-ex="jpg">ייצוא JPG (עמוד זה)</button>
+        <button data-ex="jpgall">כל העמודים כ-JPG (ZIP)</button>
+        <button data-close>ביטול</button></div>`);
+    const el = m.el;
+    const info = () => {
+      const b = +o.bleed || 0, w = Math.round((210 + 2 * b) / 25.4 * o.dpi), h = Math.round((297 + 2 * b) / 25.4 * o.dpi);
+      $('#exInfo', el).innerHTML = `גודל עמוד: <b>${210 + 2 * b}×${297 + 2 * b} מ"מ</b>${b ? ' (A4 עם גלישה)' : ' (A4)'} · תמונה: <b>${w}×${h}</b> פיקסלים ב-${o.dpi}dpi`
+        + (o.marks && b ? ' · עם סימני חיתוך' : '') + (+o.dpi >= 600 ? '<br>600dpi לוקח יותר זמן ויוצר קובץ גדול.' : '');
+    };
+    const sync = () => { $('#exDpi', el).value = o.dpi; $('#exBleed', el).value = o.bleed; $('#exMarks', el).checked = o.marks; info(); };
+    info();
+    el.addEventListener('input', e => {
+      const t = e.target;
+      if (t.id === 'exPreset') { o.preset = t.value; if (EXPORT_PRESETS[t.value]) Object.assign(o, EXPORT_PRESETS[t.value]); sync(); return; }
+      if (t.id === 'exDpi') o.dpi = +t.value;
+      if (t.id === 'exBleed') o.bleed = clamp(parseFloat(t.value) || 0, 0, 10);
+      if (t.id === 'exMarks') o.marks = t.checked;
+      if (t.id === 'exQ') { o.pdfQuality = t.value; return; }
+      o.preset = 'custom'; $('#exPreset', el).value = 'custom'; info();
+    });
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-ex]'); if (!b) return;
+      exportOpts = o; saveExportOpts(); m.close();
+      if (b.dataset.ex === 'pdf') exportPDF(o);
+      if (b.dataset.ex === 'jpg') exportJPG(o);
+      if (b.dataset.ex === 'jpgall') exportAllJPG(o);
+    });
+  }
+  $('#btnExportJpg').onclick = () => openExportDialog('jpg');
+  $('#btnExportPdf').onclick = () => openExportDialog('pdf');
 
   // ---------- אקסל: עמודות ----------
   const COLS = [
@@ -1101,11 +1354,16 @@
           const f = findImage(it, files);
           if (f) {
             if (!cache.has(f)) {
-              let url = await normalizeImage(await fileToDataURL(f));
-              if (autoBg) { const c = floodRemove(toCanvas(await loadImg(url)), tolerance); url = flattenOnWhite(trimmed(c, true)); }
-              cache.set(f, addAsset(url));
+              const url = await normalizeImage(await fileToDataURL(f));
+              if (autoBg) {
+                const src = toCanvas(await loadImg(url));
+                const cut = floodRemove(copyCanvas(src), tolerance);
+                refineCutout(cut, src, { hard: 50, shrink: 0, specks: true });
+                cache.set(f, { img: addAsset(flattenOnWhite(trimmed(cut, true))), orig: addAsset(url), cut: addAsset(cut.toDataURL('image/png')) });
+              } else cache.set(f, { img: addAsset(url) });
             }
-            p.img = cache.get(f); p.imgName = f.name;
+            Object.assign(p, cache.get(f));
+            p.imgName = f.name;
           }
           pg.products.push(p);
           done++; if (done % 5 === 0) { setBusy(`יוצר עמודים… ${done} מתוך ${total} מוצרים`); await new Promise(z => setTimeout(z, 0)); }
@@ -1127,7 +1385,7 @@
     const out = {};
     const add = id => { if (id && assets[id]) out[id] = assets[id]; };
     add(state.settings.logoFooter);
-    state.pages.forEach(p => { add(p.logo); p.products.forEach(x => { add(x.img); add(x.orig); }); });
+    state.pages.forEach(p => { add(p.logo); p.products.forEach(x => { add(x.img); add(x.orig); add(x.cut); }); });
     return out;
   }
   function loadState(obj) {
@@ -1184,5 +1442,5 @@
   window.addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(zoomFit, 150); });
   init();
 
-  window.__catalog = { get state() { return state; }, normalizeEAN, renderCanvas, goPage, parseRows, groupItems };
+  window.__catalog = { get state() { return state; }, normalizeEAN, renderCanvas, goPage, parseRows, groupItems, refineCutout, flattenOnWhite };
 })();
