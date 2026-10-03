@@ -47,14 +47,18 @@
 - **תצוגה מקדימה:** מציגה את כל העמודים, ברוחב מסך או מוקטנים. לחיצה על עמוד פותחת אותו לעריכה.
 - לחיצה על מוצר בתצוגה המקדימה פותחת את השדות שלו. אפשר גם לגרור תמונה ישירות על מוצר בדף.
 - כמה עמודים בקטלוג: הוספה, שכפול ומחיקה של עמודים.
-- **ייצוא לדפוס:** בחלון הייצוא בוחרים את מטרת הקובץ:
-  - **בית דפוס (ברירת מחדל):** ‏300dpi, גלישה של 3 מ"מ מכל צד וסימני חיתוך
-  - **דפוס בלי גלישה:** ‏300dpi, ‏A4 מדויק
-  - **איכות גבוהה במיוחד:** ‏600dpi
-  - **מסך או מייל:** ‏150dpi
-  - JPG נשמר באיכות 100%. ב-PDF אפשר לבחור JPEG באיכות 100% או PNG ללא איבוד איכות. אפשר לייצא PDF של כל העמודים, JPG של עמוד אחד, או את כל העמודים כ-JPG בקובץ ZIP.
-  - הברקוד נשמר כגרפיקה וקטורית, והתמונות נשמרות ברזולוציה של עד 3000 פיקסלים, כך שהם חדים גם ב-600dpi.
+- **ייצוא לדפוס, כמו מתוכנת עימוד מקצועית:**
+  - **PDF מקצועי (ברירת מחדל):**
+    - הטקסט נשאר טקסט וקטורי, עם גופנים מוטמעים.
+    - הצורות, הפסים והברקוד וקטוריים.
+    - הצבעים ב-CMYK. אפור ושחור מודפסים בדיו שחור בלבד.
+    - התמונות מומרות ל-CMYK בצפיפות שנבחרה.
+    - מוגדרים TrimBox ו-BleedBox, יש סימני חיתוך בצבע רישום, וגלישה של 3 מ"מ.
+  - **ערכי CMYK מדויקים:** אפשר להזין לצבעי המותג ב"עיצוב מתקדם".
+  - **בדיקה לפני דפוס (Preflight):** בודקת רזולוציית תמונות בגודל ההדפסה וברקודים לא תקינים.
+  - **אפשרויות נוספות:** ‏300, 400 או 600dpi; ‏A4 מדויק או עם גלישה; JPG ב-RGB או ב-CMYK; PDF כתמונה אחת לכל עמוד.
+  - **גופנים:** ‏Heebo, ‏Assistant, ‏Rubik, ‏Secular One ו-Arimo מוטמעים באפליקציה. המסך וה-PDF משתמשים באותם קבצי גופן, גם בלי אינטרנט.
 - **שמירה:** העבודה נשמרת אוטומטית בדפדפן. אפשר גם לשמור קובץ פרויקט (`.json`) ולפתוח אותו מאוחר יותר.
 
 ## ספריות (`lib/`)
-[JsBarcode](https://github.com/lindell/JsBarcode), [SheetJS](https://sheetjs.com) (אקסל), [JSZip](https://stuk.github.io/jszip/), [jsPDF](https://github.com/parallax/jsPDF), [html2canvas-pro](https://github.com/yorickshan/html2canvas-pro). הסרת רקע AI משתמשת ב-[@imgly/background-removal](https://github.com/imgly/background-removal-js), שנטען מהאינטרנט רק כשמשתמשים בו.
+[JsBarcode](https://github.com/lindell/JsBarcode), מקודד JPEG ב-CMYK (מבוסס [jpeg-js](https://github.com/jpeg-js/jpeg-js)), גופנים מ-Google Fonts (רישיונות OFL ו-Apache), [SheetJS](https://sheetjs.com) (אקסל), [JSZip](https://stuk.github.io/jszip/), [jsPDF](https://github.com/parallax/jsPDF), [html2canvas-pro](https://github.com/yorickshan/html2canvas-pro). הסרת רקע AI משתמשת ב-[@imgly/background-removal](https://github.com/imgly/background-removal-js), שנטען מהאינטרנט רק כשמשתמשים בו.

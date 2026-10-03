@@ -61,6 +61,7 @@
       codeLabel: 'קוד פריט', packLabel: 'אריזה', website: 'www.sirka.co.il',
       logoFooter: null, showFooterLogo: true, firstPage: 5, showPageNum: true,
       titleFont: 'Heebo', titleSize: 20, nameSize: 10.5, rowSize: 9.6, hdrSize: 15.5,
+      cmykAccent: '', cmykTitle: '', cmykPanel: '', cmykGrayFrom: '', cmykGrayTo: '', cmykText: '',
     };
   }
   function sampleState() {
@@ -147,7 +148,7 @@
     const H = [];
     const titleH = 30 * k, panelY = R.y + titleH + 4.6 * k, panelH = R.h - titleH - 4.6 * k;
     H.push(`<div data-slot="${i}">`);
-    H.push(`<div class="abs c-title" style="${box(R.x, R.y, R.w, titleH)}color:${s.titleColor};font-family:'${s.titleFont}',Arial,sans-serif;font-size:${(s.titleSize * k).toFixed(2)}px;">${esc(p.title)}</div>`);
+    H.push(`<div class="abs c-title" style="${box(R.x, R.y, R.w, titleH)}padding-bottom:${(5 * k).toFixed(2)}px;color:${s.titleColor};font-family:'${s.titleFont}',Arial,sans-serif;font-size:${(s.titleSize * k).toFixed(2)}px;">${esc(p.title)}</div>`);
     H.push(`<div class="abs" style="${box(R.x, R.y + titleH, R.w / 2, Math.max(2, 3 * k))}background:${s.accent};"></div>`);
     H.push(`<div class="abs c-panel" style="${box(R.x, panelY, R.w, panelH)}background:${s.panel};">`);
     const iw = 90.5 * k, ix = (R.w - iw) / 2;
@@ -179,7 +180,9 @@
     const tanTop = L.redSlant / L.redH, tanBot = L.botRed.slant / L.botRed.h;
     H.push(`<div class="abs" style="${box(-B, -B, PAGE_W + 2 * B, L.grayH + B)}background:linear-gradient(to right, ${s.grayFrom} 0%, ${s.grayFrom} 45%, ${s.grayTo} 100%);"></div>`);
     H.push(`<div class="abs" style="${box(-B, -B, L.redW + B, L.redH + B)}background:${s.accent};"></div>`);
-    H.push(`<div class="abs" style="${box(L.redW - L.redSlant - B * tanTop, -B, L.redSlant * 2, L.redH + B)}background:${s.accent};transform:skewX(${-Math.atan(tanTop) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
+    const skTop = Math.atan(tanTop) * 180 / Math.PI;
+    H.push(`<div class="abs" style="${box(L.redW - L.redSlant - B * tanTop, -B, L.redSlant, L.redH + B)}background:${s.accent};transform:skewX(${skTop}deg);transform-origin:0 0;"></div>`);
+    H.push(`<div class="abs" style="${box(L.redW - B * tanTop, -B, 34, L.grayH + B)}background:linear-gradient(to right, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);transform:skewX(${skTop}deg);transform-origin:0 0;"></div>`);
     if (pg.logo && assets[pg.logo]) {
       const k = (pg.logoScale || 100) / 100, w = L.logo.w * k, h = L.logo.h * k;
       H.push(`<img class="abs c-logo" data-go="header" src="${assets[pg.logo]}" style="${box(L.logo.x, L.logo.y + (L.logo.h - h) / 2, w, h)}object-position:left center;">`);
@@ -201,7 +204,7 @@
     if (s.showFooterLogo && s.logoFooter && assets[s.logoFooter]) H.push(`<img class="abs c-logo" data-go="footer" src="${assets[s.logoFooter]}" style="${box(L.foot.logo.x, L.foot.logo.y, L.foot.logo.w, L.foot.logo.h)}">`);
     H.push(`<div class="abs c-foot-web" data-go="footer" style="right:${px(L.foot.webRight)};top:${px(L.foot.cy - 10)};width:300px;height:20px;font-size:13.5px;line-height:20px;letter-spacing:2.6px;">${esc(s.website)}</div>`);
     H.push(`<div class="abs" style="${box(-B, L.botRed.y, L.botRed.w + B, L.botRed.h + B)}background:${s.accent};"></div>`);
-    H.push(`<div class="abs" style="${box(L.botRed.w - L.botRed.slant, L.botRed.y, L.botRed.slant * 2, L.botRed.h + B)}background:${s.accent};transform:skewX(${-Math.atan(tanBot) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
+    H.push(`<div class="abs" style="${box(L.botRed.w - L.botRed.slant, L.botRed.y, L.botRed.slant, L.botRed.h + B)}background:${s.accent};transform:skewX(${Math.atan(tanBot) * 180 / Math.PI}deg);transform-origin:0 0;"></div>`);
     el.innerHTML = B ? `<div class="abs" style="${box(B, B, PAGE_W, PAGE_H)}">${H.join('')}</div>` : H.join('');
     if (!interactive) $$('[data-slot],[data-go]', el).forEach(n => { n.removeAttribute('data-slot'); n.removeAttribute('data-go'); });
     return el;
@@ -249,6 +252,11 @@
   const color = (label, path, val) => `<div class="f"><label for="${idOf(path)}">${label}</label><input type="color" id="${idOf(path)}" data-path="${path}" value="${val}"></div>`;
   const range = (label, path, val, min, max) => `<div class="f"><label for="${idOf(path)}">${label}: <span data-out="${path}">${val}</span></label><input type="range" id="${idOf(path)}" data-path="${path}" value="${val}" min="${min}" max="${max}"></div>`;
   const check = (label, path, val) => `<label class="check"><input type="checkbox" id="${idOf(path)}" data-path="${path}" ${val ? 'checked' : ''}> ${label}</label>`;
+  const cmykField = (label, key, hex) => {
+    const c = parseRGBA(cssColor(hex)) || { r: 0, g: 0, b: 0 };
+    const auto = rgbToCmyk(c.r, c.g, c.b).map(v => Math.round(v * 100)).join(',');
+    return `<div class="f"><label for="fld-s-${key}">${label}</label><input type="text" id="fld-s-${key}" data-path="s.${key}" value="${esc(state.settings[key] || '')}" placeholder="אוטומטי: ${auto}" dir="ltr"></div>`;
+  };
   const layoutOptions = cur => LAYOUTS.map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
 
   function imgField(key, assetId, opts = {}) {
@@ -320,6 +328,12 @@
       <div class="hint">הגדלים הם לפריסת 4 מוצרים; בפריסות צפופות יותר הכול מוקטן באופן יחסי.</div>
       <div class="f2">${txt('כיתוב "קוד פריט"', 's.codeLabel', s.codeLabel)}${txt('כיתוב "אריזה"', 's.packLabel', s.packLabel)}</div>
       <div class="f"><label for="tolRange">רגישות הסרת רקע מהירה: <span id="tolOut">${tolerance}</span></label><input type="range" id="tolRange" min="5" max="120" value="${tolerance}"><div class="hint">גבוה יותר = מסיר יותר. "הסר רקע" מתאים לרקע אחיד; "AI" לכל רקע${IN_VIEWER ? ' (זמין רק כשפותחים את הקובץ מהמחשב)' : ' (דורש אינטרנט)'}.</div></div>
+      <details class="box"><summary><b>ערכי CMYK לדפוס (אופציונלי)</b></summary>
+        <div class="hint">כמו בתוכנת עימוד: אם יש לכם ערכי CMYK מדויקים של צבעי המותג (מבית הדפוס או ממדריך המותג), הזינו אותם כאן באחוזים: C,M,Y,K. שדה ריק = המרה אוטומטית.</div>
+        <div class="f2">${cmykField('צבע ראשי', 'cmykAccent', s.accent)}${cmykField('כותרות מוצר', 'cmykTitle', s.titleColor)}</div>
+        <div class="f2">${cmykField('רקע מוצר', 'cmykPanel', s.panel)}${cmykField('צבע טקסט', 'cmykText', s.textColor)}</div>
+        <div class="f2">${cmykField('פס עליון – התחלה', 'cmykGrayFrom', s.grayFrom)}${cmykField('פס עליון – סוף', 'cmykGrayTo', s.grayTo)}</div>
+      </details>
       <div><button class="small" data-act="resetDesign">החזר עיצוב ברירת מחדל</button></div>
     </div></details>`);
 
@@ -911,7 +925,7 @@
     hq: { label: 'איכות גבוהה במיוחד: 600dpi, A4 מדויק', dpi: 600, bleed: 0, marks: false },
     screen: { label: 'מסך או מייל: 150dpi, קובץ קטן', dpi: 150, bleed: 0, marks: false },
   };
-  let exportOpts = { preset: 'print', dpi: 300, bleed: 3, marks: true, pdfQuality: 'jpeg' };
+  let exportOpts = { preset: 'print', dpi: 300, bleed: 3, marks: true, pdfQuality: 'jpeg', pdfMode: 'vector', color: 'cmyk', jpgCmyk: false };
   try { Object.assign(exportOpts, JSON.parse(localStorage.getItem('catalog-export') || '{}')); } catch (e) { /* ללא אחסון */ }
   const saveExportOpts = () => { try { localStorage.setItem('catalog-export', JSON.stringify(exportOpts)); } catch (e) { /* ללא אחסון */ } };
   const MM = 96 / 25.4;   // פיקסלים במילימטר (ב-96dpi)
@@ -973,9 +987,30 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
+  // רזולוציה בקובץ JPG בצבעי CMYK – בלוק Photoshop (APP13), כמו בקבצים מתוכנות עריכה
+  function withPhotoshopDpi(bytes, dpi) {
+    const res = [0x38, 0x42, 0x49, 0x4D, 0x03, 0xED, 0, 0, 0, 0, 0, 16,
+      (dpi >> 8) & 255, dpi & 255, 0, 0, 0, 1, 0, 1, (dpi >> 8) & 255, dpi & 255, 0, 0, 0, 1, 0, 1];
+    const head = [...'Photoshop 3.0'].map(c => c.charCodeAt(0)).concat([0]);
+    const payload = head.concat(res), len = payload.length + 2;
+    const seg = new Uint8Array([0xFF, 0xED, len >> 8, len & 255, ...payload]);
+    const out = new Uint8Array(bytes.length + seg.length);
+    out.set(bytes.subarray(0, 2), 0); out.set(seg, 2); out.set(bytes.subarray(2), 2 + seg.length);
+    return out;
+  }
   const optsTag = o => `${o.dpi}dpi` + (+o.bleed ? ` גלישה ${o.bleed}mm` : '');
   async function jpgBlob(index, o) {
     const c = await renderCanvas(index, o);
+    if (o.jpgCmyk) {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, out = new Uint8Array(c.width * c.height * 4);
+      for (let i = 0; i < d.length; i += 4) {
+        const v = rgbToCmyk(d[i], d[i + 1], d[i + 2]);
+        out[i] = 255 - Math.round(v[0] * 255); out[i + 1] = 255 - Math.round(v[1] * 255); out[i + 2] = 255 - Math.round(v[2] * 255); out[i + 3] = 255 - Math.round(v[3] * 255);
+      }
+      const jpg = window.encodeCMYKJpeg(out, c.width, c.height, 97);
+      c.width = c.height = 0;
+      return new Blob([withPhotoshopDpi(jpg, +o.dpi)], { type: 'image/jpeg' });
+    }
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 1.0));
     c.width = c.height = 0;
     return new Blob([setJpegDpi(new Uint8Array(await blob.arrayBuffer()), +o.dpi)], { type: 'image/jpeg' });
@@ -1003,6 +1038,7 @@
     } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); } finally { hideBusy(); }
   }
   async function exportPDF(o = exportOpts) {
+    if (o.pdfMode !== 'raster') return exportVectorPDF(o);
     showBusy(`מייצא PDF ‏(${o.dpi}dpi)…`);
     try {
       const { jsPDF } = window.jspdf;
@@ -1016,6 +1052,7 @@
         if (o.pdfQuality === 'png') pdf.addImage(c, 'PNG', slug, slug, 210 + 2 * b, 297 + 2 * b, undefined, 'FAST');
         else pdf.addImage(c.toDataURL('image/jpeg', 1.0), 'JPEG', slug, slug, 210 + 2 * b, 297 + 2 * b, undefined, 'NONE');
         c.width = c.height = 0;
+        setPageBoxes(pdf, slug, b);
         if (o.marks) drawCropMarks(pdf, slug + b, slug + b, 210, 297, b);
         await new Promise(z => setTimeout(z, 0));
       }
@@ -1024,14 +1061,370 @@
       await download(pdf.output('blob'), `${fileBase()} (${optsTag(o)}).pdf`);
     } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); } finally { hideBusy(); }
   }
+  // TrimBox / BleedBox – כמו בתוכנות עימוד, כדי שתוכנת בית הדפוס תזהה את קו החיתוך
+  function setPageBoxes(pdf, slug, bleed) {
+    const pt = mm => mm * 72 / 25.4;
+    const ctx = pdf.internal.getCurrentPageInfo().pageContext;
+    ctx.trimBox = { bottomLeftX: pt(slug + bleed), bottomLeftY: pt(slug + bleed), topRightX: pt(slug + bleed + 210), topRightY: pt(slug + bleed + 297) };
+    ctx.bleedBox = { bottomLeftX: pt(slug), bottomLeftY: pt(slug), topRightX: pt(slug + 2 * bleed + 210), topRightY: pt(slug + 2 * bleed + 297) };
+  }
+
+  // ---------- PDF וקטורי מקצועי: CMYK, טקסט וקטורי וגופנים מוטמעים ----------
+  // הדף נבנה ב-DOM, ומכל רכיב נלקחים המיקום והסגנון המדויקים ומצוירים כאובייקטים וקטוריים ב-PDF
+  const PX = 25.4 / 96;   // מ"מ לפיקסל
+  function parseRGBA(str) {
+    const m = /rgba?\(([^)]+)\)/.exec(str || ''); if (!m) return null;
+    const v = m[1].split(/[ ,/]+/).filter(Boolean).map(parseFloat);
+    return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 };
+  }
+  const hex2 = n => Math.round(n).toString(16).padStart(2, '0');
+  const rgbHex = c => '#' + hex2(c.r) + hex2(c.g) + hex2(c.b);
+  function parseCMYK(str) {
+    const v = String(str || '').split(/[ ,/]+/).filter(Boolean).map(parseFloat);
+    return v.length === 4 && v.every(n => !isNaN(n)) ? v.map(n => clamp(n, 0, 100) / 100) : null;
+  }
+  // המרת RGB ל-CMYK: אפור ושחור – רק בדיו שחור (K), כמו בעבודה מקצועית; צבע – הפרדה עם GCR מלא
+  function rgbToCmyk(r, g, b) {
+    if (Math.abs(r - g) <= 4 && Math.abs(g - b) <= 4 && Math.abs(r - b) <= 4) return [0, 0, 0, 1 - (r + g + b) / 765];
+    let c = 1 - r / 255, m = 1 - g / 255, y = 1 - b / 255;
+    const k = Math.min(c, m, y);
+    if (k >= 1) return [0, 0, 0, 1];
+    return [(c - k) / (1 - k), (m - k) / (1 - k), (y - k) / (1 - k), k];
+  }
+  function cmykOverrides() {
+    const s = state.settings, map = new Map();
+    [['accent', 'cmykAccent'], ['titleColor', 'cmykTitle'], ['panel', 'cmykPanel'], ['grayFrom', 'cmykGrayFrom'], ['grayTo', 'cmykGrayTo'], ['textColor', 'cmykText']]
+      .forEach(([k, ck]) => { const v = parseCMYK(s[ck]); if (v && s[k]) map.set(s[k].toLowerCase(), v); });
+    return map;
+  }
+  function makeColorFn(mode) {
+    const over = cmykOverrides();
+    return c => {
+      if (mode === 'rgb') return [c.r, c.g, c.b];
+      return (over.get(rgbHex(c)) || rgbToCmyk(c.r, c.g, c.b)).map(v => Math.round(v * 10000) / 10000);
+    };
+  }
+  const applyFill = (pdf, col) => col.length === 4 ? pdf.setFillColor(...col) : pdf.setFillColor(...col);
+  const applyText = (pdf, col) => col.length === 4 ? pdf.setTextColor(...col) : pdf.setTextColor(...col);
+
+  // תמונה → JPEG ב-CMYK (או RGB), בצפיפות של עד dpi נקודות לאינץ' בגודל ההדפסה
+  async function imageForPdf(src, wMM, hMM, dpi, mode, bg) {
+    const img = await loadImg(src);
+    const tw = Math.max(1, Math.min(img.naturalWidth, Math.round(wMM / 25.4 * dpi)));
+    const th = Math.max(1, Math.min(img.naturalHeight, Math.round(hMM / 25.4 * dpi)));
+    const c = document.createElement('canvas'); c.width = tw; c.height = th;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.imageSmoothingQuality = 'high';
+    g.fillStyle = bg ? `rgb(${bg.r},${bg.g},${bg.b})` : '#fff'; g.fillRect(0, 0, tw, th);
+    g.drawImage(img, 0, 0, tw, th);
+    if (mode === 'rgb') return { data: c.toDataURL('image/jpeg', 0.97), fmt: 'JPEG' };
+    const d = g.getImageData(0, 0, tw, th).data, out = new Uint8Array(tw * th * 4);
+    for (let i = 0, j = 0; i < d.length; i += 4, j += 4) {
+      const [cc, m, y, k] = rgbToCmyk(d[i], d[i + 1], d[i + 2]);
+      out[j] = 255 - Math.round(cc * 255); out[j + 1] = 255 - Math.round(m * 255); out[j + 2] = 255 - Math.round(y * 255); out[j + 3] = 255 - Math.round(k * 255);
+    }
+    return { data: window.encodeCMYKJpeg(out, tw, th, 95), fmt: 'JPEG' };
+  }
+
+  const fontsUsed = new Set();
+  function pdfFontFor(pdf, family, weight) {
+    const F = window.PDF_FONTS || {};
+    let fam = String(family || '').split(',')[0].replace(/["']/g, '').trim();
+    if (!F[fam]) fam = /arial|helvetica|sans/i.test(fam) ? 'Arimo' : 'Heebo';
+    const ws = Object.keys(F[fam]).map(Number);
+    const w = ws.reduce((best, x) => Math.abs(x - weight) < Math.abs(best - weight) ? x : best, ws[0]);
+    const name = `${fam.replace(/\s+/g, '')}-${w}`;
+    if (!pdf.__fonts) pdf.__fonts = new Set();
+    if (!pdf.__fonts.has(name)) {
+      pdf.addFileToVFS(name + '.ttf', F[fam][w]);
+      pdf.addFont(name + '.ttf', name, 'normal');
+      pdf.__fonts.add(name);
+    }
+    return name;
+  }
+
+  // מרחק קו הבסיס מראש תיבת הטקסט, לפי הגופן כפי שהדפדפן מצייר אותו
+  const baselineCache = new Map();
+  function baselineOffset(cs, host) {
+    const key = cs.fontFamily + '|' + cs.fontWeight + '|' + cs.fontSize + '|' + cs.fontStyle;
+    if (baselineCache.has(key)) return baselineCache.get(key);
+    const probe = document.createElement('span');
+    probe.style.cssText = `position:absolute;left:0;top:0;white-space:nowrap;line-height:normal;letter-spacing:0;font-family:${cs.fontFamily};font-weight:${cs.fontWeight};font-size:${cs.fontSize};font-style:${cs.fontStyle}`;
+    const t = document.createTextNode('Hא'); probe.appendChild(t);
+    const mark = document.createElement('span'); mark.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+    probe.appendChild(mark); host.appendChild(probe);
+    const r = document.createRange(); r.selectNodeContents(t);
+    const off = mark.getBoundingClientRect().top - r.getBoundingClientRect().top;
+    probe.remove();
+    baselineCache.set(key, off);
+    return off;
+  }
+
+  const MIRROR = { '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{', '<': '>', '>': '<' };
+  function drawTextNodes(pdf, pageEl, origin, colorFn) {
+    const pr = pageEl.getBoundingClientRect();
+    const tw = document.createTreeWalker(pageEl, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    for (let node = tw.nextNode(); node; node = tw.nextNode()) {
+      const text = node.nodeValue;
+      if (!text || !text.trim()) continue;
+      const el = node.parentElement, cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+      const col = parseRGBA(cs.color); if (!col || col.a === 0) continue;
+      const clipEl = el.closest('.c-title, .c-name, .c-panel, .c-row');
+      const clip = clipEl ? clipEl.getBoundingClientRect() : null;
+      const chars = [];
+      for (let i = 0; i < text.length; i++) {
+        range.setStart(node, i); range.setEnd(node, i + 1);
+        const rc = range.getClientRects()[0];
+        if (!rc || rc.width === 0 && !/\S/.test(text[i])) continue;
+        if (clip && (rc.left + rc.width / 2 < clip.left - 0.5 || rc.left + rc.width / 2 > clip.right + 0.5 || rc.top + rc.height / 2 > clip.bottom + 0.5 || rc.top + rc.height / 2 < clip.top - 0.5)) continue;
+        chars.push({ ch: text[i], l: rc.left, r: rc.right, t: rc.top });
+      }
+      if (!chars.length) continue;
+      const size = parseFloat(cs.fontSize), weight = parseInt(cs.fontWeight, 10) || 400;
+      const fontName = pdfFontFor(pdf, cs.fontFamily, weight);
+      const base = baselineOffset(cs, pageEl);
+      const ls = parseFloat(cs.letterSpacing) || 0;
+      const rtl = cs.direction === 'rtl';
+      pdf.setFont(fontName, 'normal');
+      pdf.setFontSize(size * 0.75);
+      applyText(pdf, colorFn(col));
+      // שורות לפי גובה, ובכל שורה מילים לפי המיקום האופקי (סדר חזותי)
+      const lines = [];
+      chars.forEach(c => { let ln = lines.find(L => Math.abs(L.t - c.t) < size * 0.4); if (!ln) lines.push(ln = { t: c.t, cs: [] }); ln.cs.push(c); });
+      lines.forEach(ln => {
+        ln.cs.sort((a, b) => a.l - b.l);
+        let word = [];
+        const flush = () => {
+          if (!word.length) return;
+          const hasHeb = word.some(c => /[\u0590-\u05FF]/.test(c.ch));
+          const str = word.map(c => (rtl || hasHeb) && MIRROR[c.ch] ? MIRROR[c.ch] : c.ch).join('');
+          const x = (word[0].l - pr.left) * PX + origin.x;
+          const y = (ln.t + base - pr.top) * PX + origin.y;
+          pdf.text(str, x, y, { baseline: 'alphabetic', charSpace: ls ? ls * PX : 0 });
+          word = [];
+        };
+        ln.cs.forEach(c => { if (/\s/.test(c.ch)) flush(); else word.push(c); });
+        flush();
+      });
+    }
+  }
+
+  // צורות, רקעים, קווים, תמונות וברקודים – לפי סדר הציור ב-DOM
+  async function drawShapes(pdf, pageEl, origin, colorFn, o, surfaces) {
+    const pr = pageEl.getBoundingClientRect();
+    const mm = (x, y) => [(x - pr.left) * PX + origin.x, (y - pr.top) * PX + origin.y];
+    const all = [pageEl, ...pageEl.querySelectorAll('*')];
+    for (const el of all) {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const poly = elementPolygon(el, cs, pr);
+      const clipEl = el !== pageEl ? el.parentElement.closest('.c-panel') : null;
+      const withClip = fn => {
+        if (!clipEl) return fn();
+        const r = clipEl.getBoundingClientRect(), [x, y] = mm(r.left, r.top);
+        pdf.saveGraphicsState(); pdf.rect(x, y, r.width * PX, r.height * PX, null); pdf.clip(); pdf.discardPath();
+        const res = fn(); pdf.restoreGraphicsState(); return res;
+      };
+      // רקע
+      const bgImg = cs.backgroundImage;
+      if (bgImg && bgImg.startsWith('linear-gradient')) drawGradient(pdf, poly, bgImg, colorFn, mm);
+      else {
+        const bg = parseRGBA(cs.backgroundColor);
+        if (bg && bg.a > 0.01) {
+          applyFill(pdf, colorFn(bg));
+          withClip(() => fillPoly(pdf, poly.map(p => mm(p[0], p[1]))));
+          surfaces.push({ poly, color: bg });
+        }
+      }
+      // קו תחתון (שורות קוד פריט / אריזה)
+      const bb = parseFloat(cs.borderBottomWidth);
+      if (bb > 0 && cs.borderBottomStyle !== 'none') {
+        const bc = parseRGBA(cs.borderBottomColor);
+        if (bc && bc.a > 0) {
+          const r = el.getBoundingClientRect(), [x, y] = mm(r.left, r.bottom - bb);
+          applyFill(pdf, colorFn(bc)); pdf.rect(x, y, r.width * PX, bb * PX, 'F');
+        }
+      }
+      if (el.tagName === 'IMG' && el.getAttribute('src')) {
+        const src = el.getAttribute('src');
+        const r = el.getBoundingClientRect();
+        if (src.startsWith('data:image/svg+xml')) { drawBarcodeSVG(pdf, src, r, mm, colorFn); continue; }
+        const nat = await loadImg(src);
+        const fit = cs.objectFit;
+        let dw = r.width, dh = r.height, dx = r.left, dy = r.top;
+        if (fit === 'contain') {
+          const k = Math.min(r.width / nat.naturalWidth, r.height / nat.naturalHeight);
+          dw = nat.naturalWidth * k; dh = nat.naturalHeight * k;
+          const [px1, py1] = (cs.objectPosition || '50% 50%').split(' ').map(v => parseFloat(v) / 100);
+          dx = r.left + (r.width - dw) * (isNaN(px1) ? 0.5 : px1); dy = r.top + (r.height - dh) * (isNaN(py1) ? 0.5 : py1);
+        }
+        // תמונה עם שקיפות (לוגו) מונחת על צבע הרקע שמתחתיה
+        const cx = dx + dw / 2, cy = dy + dh / 2;
+        const under = [...surfaces].reverse().find(sf => pointInPoly(cx, cy, sf.poly));
+        const [x, y] = mm(dx, dy);
+        const im = await imageForPdf(src, dw * PX, dh * PX, +o.dpi || 300, o.color, under ? under.color : { r: 255, g: 255, b: 255 });
+        withClip(() => pdf.addImage(im.data, im.fmt, x, y, dw * PX, dh * PX, undefined, 'NONE'));
+      }
+    }
+  }
+  function elementPolygon(el, cs, pr) {
+    // תיבה מקורית (לפני transform) ביחס לעמוד
+    let L = 0, T = 0, n = el;
+    const pageEl = el.closest('.cpage');
+    if (el === pageEl) { const r = el.getBoundingClientRect(); return [[r.left, r.top], [r.right, r.top], [r.right, r.bottom], [r.left, r.bottom]]; }
+    while (n && n !== pageEl) { L += n.offsetLeft; T += n.offsetTop; n = n.offsetParent; }
+    const W = el.offsetWidth, H = el.offsetHeight;
+    const ox = pr.left, oy = pr.top;
+    const t = cs.transform;
+    let a = 1, b = 0, c = 0, d = 1, e = 0, f = 0;
+    if (t && t !== 'none') { const m = /matrix\(([^)]+)\)/.exec(t); if (m) [a, b, c, d, e, f] = m[1].split(',').map(parseFloat); }
+    const [tox, toy] = (cs.transformOrigin || '0 0').split(' ').map(parseFloat);
+    const P = (x, y) => { const lx = x - tox, ly = y - toy; return [ox + L + tox + a * lx + c * ly + e, oy + T + toy + b * lx + d * ly + f]; };
+    return [P(0, 0), P(W, 0), P(W, H), P(0, H)];
+  }
+  function fillPoly(pdf, pts) {
+    const segs = []; for (let i = 1; i < pts.length; i++) segs.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+    pdf.lines(segs, pts[0][0], pts[0][1], [1, 1], 'F', true);
+  }
+  function pointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // מעבר צבע אופקי: פסים צרים (וקטוריים) בצבע מחושב לכל נקודה
+  function drawGradient(pdf, poly, str, colorFn, mm) {
+    const stops = [];
+    const re = /(rgba?\([^)]+\))\s*([\d.]+)%?/g; let m;
+    while ((m = re.exec(str))) stops.push({ c: parseRGBA(m[1]), p: parseFloat(m[2]) / 100 });
+    if (stops.length < 2) return;
+    const at = p => {
+      let i = 0; while (i < stops.length - 2 && p > stops[i + 1].p) i++;
+      const A = stops[i], B = stops[i + 1], t = clamp((p - A.p) / ((B.p - A.p) || 1), 0, 1);
+      return { r: A.c.r + (B.c.r - A.c.r) * t, g: A.c.g + (B.c.g - A.c.g) * t, b: A.c.b + (B.c.b - A.c.b) * t, a: A.c.a + (B.c.a - A.c.a) * t };
+    };
+    const [p0, p1, p2, p3] = poly;   // מקבילית: עליון שמאל, עליון ימין, תחתון ימין, תחתון שמאל
+    const N = 160;
+    for (let i = 0; i < N; i++) {
+      const t0 = i / N, t1 = Math.min(1, (i + 1) / N + 0.002), col = at((i + 0.5) / N);
+      if (col.a < 0.01) continue;
+      const lerp = (P, Q, t) => [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t];
+      const q = [lerp(p0, p1, t0), lerp(p0, p1, t1), lerp(p3, p2, t1), lerp(p3, p2, t0)].map(p => mm(p[0], p[1]));
+      const gs = col.a < 0.99 ? new pdf.GState({ opacity: col.a }) : null;
+      if (gs) { pdf.saveGraphicsState(); pdf.setGState(gs); }
+      applyFill(pdf, colorFn(col)); fillPoly(pdf, q);
+      if (gs) pdf.restoreGraphicsState();
+    }
+  }
+  // ברקוד וקטורי: הפסים כמלבנים בשחור (K בלבד) והספרות כטקסט
+  function drawBarcodeSVG(pdf, src, r, mm, colorFn) {
+    const xml = decodeURIComponent(src.slice(src.indexOf(',') + 1));
+    const doc = new DOMParser().parseFromString(xml, 'image/svg+xml');
+    const svg = doc.documentElement;
+    const [, , vw, vh] = svg.getAttribute('viewBox').split(/\s+/).map(parseFloat);
+    const sx = r.width / vw, sy = r.height / vh;
+    const walk = (node, tx, ty, fill) => {
+      for (const ch of node.children) {
+        let x = tx, y = ty;
+        const tr = ch.getAttribute('transform'); const m = tr && /translate\(([^,)]+)[, ]+([^)]+)\)/.exec(tr);
+        if (m) { x += parseFloat(m[1]); y += parseFloat(m[2]); }
+        const f = ch.getAttribute('fill') || (ch.getAttribute('style') || '').replace(/.*fill:\s*([^;]+).*/, '$1') || fill;
+        if (ch.tagName === 'rect') {
+          const c = parseRGBA(cssColor(f)); if (!c) continue;
+          const [px0, py0] = mm(r.left + (x + +ch.getAttribute('x')) * sx, r.top + (y + +ch.getAttribute('y')) * sy);
+          applyFill(pdf, colorFn(c)); pdf.rect(px0, py0, +ch.getAttribute('width') * sx * PX, +ch.getAttribute('height') * sy * PX, 'F');
+        } else if (ch.tagName === 'text') {
+          const c = parseRGBA(cssColor(f)) || { r: 0, g: 0, b: 0, a: 1 };
+          if (!ch.textContent.trim()) continue;
+          const fs = parseFloat(ch.getAttribute('font-size')) || parseFloat((ch.getAttribute('style') || '').replace(/.*font:\s*([\d.]+)px.*/, '$1')) || 20;
+          pdf.setFont(pdfFontFor(pdf, 'Arimo', 400), 'normal'); pdf.setFontSize(fs * sy * 0.75); applyText(pdf, colorFn(c));
+          const anchor = ch.getAttribute('text-anchor') || 'start';
+          const [tx2, ty2] = mm(r.left + (x + +ch.getAttribute('x')) * sx, r.top + (y + +ch.getAttribute('y')) * sy);
+          pdf.text(ch.textContent, tx2, ty2, { align: anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left', baseline: 'alphabetic' });
+        } else if (ch.tagName === 'g') walk(ch, x, y, f);
+      }
+    };
+    walk(svg, 0, 0, '#000000');
+  }
+  const cssColorCtx = document.createElement('canvas').getContext('2d');
+  function cssColor(v) { cssColorCtx.fillStyle = '#000'; cssColorCtx.fillStyle = v; const h = cssColorCtx.fillStyle; return h.startsWith('#') ? `rgb(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)})` : h; }
+
+  async function exportVectorPDF(o = exportOpts) {
+    showBusy('מכין PDF מקצועי…');
+    const hostEl = $('#exportHost');
+    try {
+      const { jsPDF } = window.jspdf;
+      const b = +o.bleed || 0, slug = o.marks ? 10 : 0, B = b * MM;
+      const pw = 210 + 2 * (b + slug), ph = 297 + 2 * (b + slug);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pw, ph], compress: true, putOnlyUsedFonts: true });
+      const colorFn = makeColorFn(o.color);
+      await document.fonts.ready;
+      for (let i = 0; i < state.pages.length; i++) {
+        setBusy(`מייצא PDF מקצועי (${o.color === 'rgb' ? 'RGB' : 'CMYK'})… עמוד ${i + 1} מתוך ${state.pages.length}`);
+        if (i > 0) pdf.addPage([pw, ph], 'portrait');
+        const el = buildPage(state.pages[i], i, false, B);
+        hostEl.replaceChildren(el);
+        await Promise.all($$('img', el).map(im => im.complete ? null : new Promise(r => { im.onload = im.onerror = r; })));
+        const origin = { x: slug, y: slug };
+        const surfaces = [];
+        await drawShapes(pdf, el, origin, colorFn, o, surfaces);
+        drawTextNodes(pdf, el, origin, colorFn);
+        setPageBoxes(pdf, slug, b);
+        if (o.marks) drawCropMarks(pdf, slug + b, slug + b, 210, 297, b);
+        await new Promise(z => setTimeout(z, 0));
+      }
+      pdf.setProperties({ title: fileBase(), subject: `A4 · ${o.color === 'rgb' ? 'RGB' : 'CMYK'} · ${optsTag(o)}`, creator: 'מחולל דפי קטלוג', keywords: 'print-ready' });
+      hideBusy();
+      await download(pdf.output('blob'), `${fileBase()} (${o.color === 'rgb' ? 'RGB' : 'CMYK'}, ${optsTag(o)}).pdf`);
+    } catch (e) { console.error(e); toast('הייצוא נכשל: ' + e.message, 'bad'); }
+    finally { hostEl.replaceChildren(); hideBusy(); }
+  }
   // סימני חיתוך בפינות קו החיתוך, מחוץ לאזור הגלישה
   function drawCropMarks(pdf, x0, y0, w, h, bleed) {
     const x1 = x0 + w, y1 = y0 + h, gap = bleed + 1, len = 6;
-    pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.1);
+    pdf.setDrawColor(1, 1, 1, 1); pdf.setLineWidth(0.1);   // צבע רישום (Registration)
     for (const x of [x0, x1]) { pdf.line(x, y0 - gap - len, x, y0 - gap); pdf.line(x, y1 + gap, x, y1 + gap + len); }
     for (const y of [y0, y1]) { pdf.line(x0 - gap - len, y, x0 - gap, y); pdf.line(x1 + gap, y, x1 + gap + len, y); }
   }
 
+  // בדיקה לפני דפוס: רזולוציית תמונות בגודל ההדפסה וברקודים לא תקינים
+  async function preflight(o) {
+    const issues = [];
+    let images = 0;
+    const ppiOf = async (id, boxW, boxH) => {
+      const im = await loadImg(assets[id]);
+      const k = Math.min(boxW / im.naturalWidth, boxH / im.naturalHeight);
+      return Math.round(96 / k);
+    };
+    for (let pi = 0; pi < state.pages.length; pi++) {
+      const pg = state.pages[pi], pn = (+state.settings.firstPage || 1) + pi;
+      const rects = slotRects(pg.layout);
+      for (let i = 0; i < rects.length; i++) {
+        const p = pg.products[i], R = rects[i], k = R.k;
+        if (!p || !p.show || isEmptyProduct(p)) continue;
+        if (p.ean && !normalizeEAN(p.ean).ok) issues.push(`עמוד ${pn}, מוצר ${i + 1}: ברקוד לא תקין`);
+        if (p.img && assets[p.img]) {
+          images++;
+          const panelH = R.h - 30 * k - 4.6 * k, infoTop = panelH - 11.2 * k - 118 * k, sc = (p.imgScale || 100) / 100;
+          const ppi = await ppiOf(p.img, (R.w - 40 * k) * sc, Math.max(10, infoTop - 17 * k - 15.4 * k) * sc);
+          if (ppi < 200) issues.push(`עמוד ${pn}, מוצר ${i + 1} (${esc(p.title || 'ללא כותרת')}): תמונה ב-${ppi}ppi – מומלץ 300, מינימום 200`);
+        }
+      }
+      if (pg.logo && assets[pg.logo]) {
+        const sc = (pg.logoScale || 100) / 100, ppi = await ppiOf(pg.logo, L.logo.w * sc, L.logo.h * sc);
+        if (ppi < 200) issues.push(`עמוד ${pn}: לוגו ב-${ppi}ppi – מומלץ קובץ לוגו גדול יותר`);
+      }
+    }
+    if (!issues.length) return `<span class="ean-msg ok">✓ הכול תקין: ${images} תמונות ברזולוציה מספקת לדפוס, וכל הברקודים תקינים.</span>`;
+    const shown = issues.slice(0, 12);
+    return `<span class="ean-msg bad">נמצאו ${issues.length} הערות:</span><ul style="margin:4px 0;padding-inline-start:18px">${shown.map(t => `<li>${t}</li>`).join('')}</ul>`
+      + (issues.length > shown.length ? `<div>ועוד ${issues.length - shown.length}…</div>` : '')
+      + '<div>אפשר לייצא בכל זאת. תמונה ברזולוציה נמוכה עלולה להיראות מטושטשת בהדפסה.</div>';
+  }
   function openExportDialog(focus = 'pdf') {
     const o = Object.assign({}, exportOpts);
     const m = openModal(`<div class="modal-head"><h2>ייצוא לדפוס</h2><button class="close-x" data-close aria-label="סגור">✕</button></div>
@@ -1044,13 +1437,21 @@
             ${[150, 300, 400, 600].map(d => `<option value="${d}" ${+o.dpi === d ? 'selected' : ''}>${d}dpi${d === 300 ? ' (תקן דפוס)' : ''}</option>`).join('')}</select></div>
             <div class="f"><label for="exBleed">גלישה (מ"מ מכל צד)</label><input type="number" id="exBleed" min="0" max="10" step="0.5" value="${o.bleed}"></div></div>
           <label class="check"><input type="checkbox" id="exMarks" ${o.marks ? 'checked' : ''}> סימני חיתוך ב-PDF</label>
-          <div class="f"><label for="exQ">דחיסת התמונה ב-PDF</label><select id="exQ">
+          <div class="f"><label for="exMode">סוג ה-PDF</label><select id="exMode">
+            <option value="vector" ${o.pdfMode !== 'raster' ? 'selected' : ''}>מקצועי: טקסט וקטורי, גופנים מוטמעים, צורות וברקוד וקטוריים (מומלץ)</option>
+            <option value="raster" ${o.pdfMode === 'raster' ? 'selected' : ''}>תמונה אחת לכל עמוד (RGB)</option></select></div>
+          <div class="f" id="exColorRow"><label for="exColor">מרחב צבע</label><select id="exColor">
+            <option value="cmyk" ${o.color !== 'rgb' ? 'selected' : ''}>CMYK לדפוס (מומלץ)</option>
+            <option value="rgb" ${o.color === 'rgb' ? 'selected' : ''}>RGB</option></select></div>
+          <label class="check"><input type="checkbox" id="exJpgCmyk" ${o.jpgCmyk ? 'checked' : ''}> קובצי JPG בצבעי CMYK</label>
+          <div class="f" id="exQRow"><label for="exQ">דחיסת התמונה ב-PDF</label><select id="exQ">
             <option value="jpeg" ${o.pdfQuality !== 'png' ? 'selected' : ''}>JPEG באיכות 100% (מומלץ)</option>
             <option value="png" ${o.pdfQuality === 'png' ? 'selected' : ''}>ללא איבוד איכות (PNG, קובץ גדול ואיטי)</option></select></div>
           <div class="summary" id="exInfo"></div>
         </div>
+        <div class="box"><h3>בדיקת קבצים לפני דפוס (Preflight)</h3><div id="exPre" class="hint">בודק…</div></div>
         <div class="hint">גלישה היא הרחבה של הרקעים שבקצה הדף (הפסים האדומים והאפורים) מעבר לקו החיתוך, כדי שלא יישאר פס לבן אחרי החיתוך. רוב בתי הדפוס מבקשים 3 מ"מ.
-          הצבעים נשמרים ב-RGB, ובית הדפוס ממיר אותם ל-CMYK.</div>
+          ב-PDF המקצועי הטקסט נשאר טקסט (לא תמונה) עם גופנים מוטמעים, הצבעים ב-CMYK (אפור ושחור בדיו שחור בלבד), התמונות ב-CMYK בצפיפות שנבחרה, ומוגדרים TrimBox ו-BleedBox כמו בייצוא מתוכנת עימוד.</div>
       </div>
       <div class="modal-foot">
         <button class="${focus === 'pdf' ? 'primary' : ''}" data-ex="pdf">ייצוא PDF (כל ${state.pages.length} העמודים)</button>
@@ -1063,6 +1464,9 @@
       $('#exInfo', el).innerHTML = `גודל עמוד: <b>${210 + 2 * b}×${297 + 2 * b} מ"מ</b>${b ? ' (A4 עם גלישה)' : ' (A4)'} · תמונה: <b>${w}×${h}</b> פיקסלים ב-${o.dpi}dpi`
         + (o.marks && b ? ' · עם סימני חיתוך' : '') + (+o.dpi >= 600 ? '<br>600dpi לוקח יותר זמן ויוצר קובץ גדול.' : '');
     };
+    preflight(o).then(html => { const n = $('#exPre', el); if (n) n.innerHTML = html; }).catch(() => {});
+    const modeVis = () => { $('#exColorRow', el).hidden = o.pdfMode === 'raster'; $('#exQRow', el).hidden = o.pdfMode !== 'raster'; };
+    modeVis();
     const sync = () => { $('#exDpi', el).value = o.dpi; $('#exBleed', el).value = o.bleed; $('#exMarks', el).checked = o.marks; info(); };
     info();
     el.addEventListener('input', e => {
@@ -1072,6 +1476,9 @@
       if (t.id === 'exBleed') o.bleed = clamp(parseFloat(t.value) || 0, 0, 10);
       if (t.id === 'exMarks') o.marks = t.checked;
       if (t.id === 'exQ') { o.pdfQuality = t.value; return; }
+      if (t.id === 'exMode') { o.pdfMode = t.value; modeVis(); return; }
+      if (t.id === 'exColor') { o.color = t.value; return; }
+      if (t.id === 'exJpgCmyk') { o.jpgCmyk = t.checked; return; }
       o.preset = 'custom'; $('#exPreset', el).value = 'custom'; info();
     });
     el.addEventListener('click', e => {
@@ -1432,7 +1839,22 @@
   function hideBusy() { $('#busy').hidden = true; }
 
   // ---------- אתחול ----------
+  // הגופנים המוטמעים נטענים גם לדף עצמו – כך המסך, ה-JPG וה-PDF משתמשים באותם קבצי גופן בדיוק, גם בלי אינטרנט
+  async function loadEmbeddedFonts() {
+    const F = window.PDF_FONTS; if (!F || !window.FontFace) return;
+    const jobs = [];
+    for (const fam of Object.keys(F)) for (const w of Object.keys(F[fam])) {
+      try {
+        const bin = atob(F[fam][w]), buf = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        const ff = new FontFace(fam, buf.buffer, { weight: String(w), style: 'normal' });
+        jobs.push(ff.load().then(f => document.fonts.add(f)).catch(() => {}));
+      } catch (e) { /* גופן לא נטען – נשאר גופן הדפדפן */ }
+    }
+    await Promise.all(jobs);
+  }
   async function init() {
+    await loadEmbeddedFonts();
     state = sampleState();
     try { const saved = await DB.get('autosave'); if (saved && saved.state) loadState(saved); } catch (e) { /* ללא שמירה */ }
     renderForm();
